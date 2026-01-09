@@ -1,0 +1,237 @@
+roast_logger.html
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Roast Logger</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  margin: 10px;
+}
+button {
+  padding: 12px;
+  margin: 6px;
+  font-size: 16px;
+  touch-action: manipulation; /* ダブルタップズーム防止 */
+}
+input {
+  font-size: 20px;
+}
+h3 { margin-top: 20px; }
+</style>
+</head>
+
+<body>
+
+<h2>☕ Roast Logger（完成版）</h2>
+
+<h3>焙煎条件</h3>
+<p>豆名：<input id="beanName"></p>
+<p>バッチ重量(g)：<input id="batchWeight" type="number"></p>
+<p>投入温度(℃)：<input id="chargeTemp" type="number"></p>
+<p>ボトム温度(℃)：<input id="turningTemp" type="number"></p>
+
+<div style="text-align:center">
+  <button onclick="startRoast()">焙煎スタート</button>
+</div>
+
+<h3 style="text-align:center;font-size:34px">
+  <span id="timer">00:00</span>
+</h3>
+
+<h3>温度入力</h3>
+<div style="text-align:center">
+  <button onclick="safeTap(tempDown)">−</button>
+
+  <input id="tempInput" type="number" step="1"
+    style="width:90px;text-align:center"> ℃
+
+  <button onclick="safeTap(tempUp)">＋</button><br><br>
+  <button onclick="safeTap(addTemp)">温度追加</button>
+</div>
+
+<h3>ガス圧</h3>
+<div style="text-align:center">
+  <button onclick="safeTap(gasDown)">−</button>
+  <span id="gasDisplay" style="font-size:24px;margin:0 15px">0.0</span>
+  <button onclick="safeTap(gasUp)">＋</button><br>
+  <button onclick="safeTap(recordGas)">ガス圧記録</button>
+</div>
+
+<h3>フェーズ</h3>
+<div style="text-align:center">
+  <button ontouchstart="startHold('dry')" ontouchend="cancelHold()">Dry End（長押し）</button>
+  <button ontouchstart="startHold('fc')" ontouchend="cancelHold()">1ハゼ（長押し）</button>
+  <button onclick="safeTap(setDrop)">Drop</button>
+</div>
+
+<canvas id="chart"></canvas>
+
+<button onclick="saveRoast()">この焙煎を保存</button>
+
+<h3>保存焙煎</h3>
+<ul id="roastList"></ul>
+
+<script>
+/* ==== ダブルタップ防止 ==== */
+let lastTap = 0;
+function safeTap(fn){
+  const now = Date.now();
+  if(now - lastTap < 400) return;
+  lastTap = now;
+  fn();
+}
+
+/* ==== 状態 ==== */
+let times=[], temps=[], gasLog=[];
+let roastStartTime=null, timerInt=null;
+let dryEndTime=null, firstCrackTime=null, dropTime=null;
+let currentTemp=0, currentGas=0.0;
+let roastList=[];
+let chart;
+
+/* ==== 初期化 ==== */
+window.onload=()=>{
+  tempInput.value=currentTemp;
+  const saved=localStorage.getItem('roastList');
+  if(saved) roastList=JSON.parse(saved);
+  updateRoastListUI();
+  initChart();
+};
+
+/* ==== タイマー ==== */
+function startRoast(){
+  times=[]; temps=[]; gasLog=[];
+  dryEndTime=firstCrackTime=dropTime=null;
+  roastStartTime=Date.now();
+  timerInt=setInterval(updateTimer,1000);
+}
+function updateTimer(){
+  const s=Math.floor((Date.now()-roastStartTime)/1000);
+  timer.textContent=format(s);
+}
+
+/* ==== 温度 ==== */
+function tempUp(){ currentTemp++; syncTemp(); }
+function tempDown(){ currentTemp--; syncTemp(); }
+function syncTemp(){ tempInput.value=currentTemp; }
+tempInput.onchange=()=> currentTemp=Number(tempInput.value);
+
+function addTemp(){
+  const s=sec();
+  times.push(s); temps.push(currentTemp);
+  drawChart();
+}
+
+/* ==== ガス ==== */
+function gasUp(){
+  currentGas=Math.round((currentGas+0.1)*10)/10;
+  gasDisplay.textContent=currentGas.toFixed(1);
+}
+function gasDown(){
+  currentGas=Math.max(0,Math.round((currentGas-0.1)*10)/10);
+  gasDisplay.textContent=currentGas.toFixed(1);
+}
+function recordGas(){
+  gasLog.push({time:sec(),gas:currentGas});
+  drawChart();
+}
+
+/* ==== フェーズ ==== */
+let holdTimer=null, holdTarget=null;
+function startHold(t){
+  holdTarget=t;
+  holdTimer=setTimeout(()=>{
+    if(t==='dry') dryEndTime=sec();
+    if(t==='fc') firstCrackTime=sec();
+    navigator.vibrate?.(100);
+    drawChart();
+  },1500);
+}
+function cancelHold(){ clearTimeout(holdTimer); }
+function setDrop(){
+  dropTime=sec();
+  clearInterval(timerInt);
+  drawChart();
+}
+
+/* ==== グラフ ==== */
+function initChart(){
+  chart=new Chart(chartCtx,{
+    type:'line',
+    data:{labels:[],datasets:[]},
+    options:{
+      scales:{
+        y:{title:{display:true,text:'Temp'}},
+        yR:{position:'right',title:{display:true,text:'RoR'},grid:{drawOnChartArea:false}},
+        yG:{position:'right',title:{display:true,text:'Gas'},grid:{drawOnChartArea:false}}
+      }
+    }
+  });
+}
+function RoR(){
+  let r=[null];
+  for(let i=1;i<temps.length;i++)
+    r.push((temps[i]-temps[i-1])/((times[i]-times[i-1])/60));
+  return r;
+}
+function gasSeries(){
+  let r=[],g=null,i=0;
+  times.forEach(t=>{
+    while(i<gasLog.length && gasLog[i].time<=t){g=gasLog[i].gas;i++;}
+    r.push(g);
+  });
+  return r;
+}
+function drawChart(){
+  chart.data.labels=times.map(t=>t/60);
+  chart.data.datasets=[
+    {label:'Temp',data:temps,tension:.3},
+    {label:'RoR',data:RoR(),yAxisID:'yR'},
+    {label:'Gas',data:gasSeries(),yAxisID:'yG',stepped:true}
+  ];
+  chart.update();
+}
+
+/* ==== 保存 ==== */
+function saveRoast(){
+  roastList.push({
+    date:new Date().toLocaleDateString(),
+    bean:beanName.value,
+    weight:batchWeight.value,
+    times,temps,gasLog,
+    dryEndTime,firstCrackTime,dropTime
+  });
+  localStorage.setItem('roastList',JSON.stringify(roastList));
+  updateRoastListUI();
+}
+function updateRoastListUI(){
+  roastListElem.innerHTML='';
+  roastList.forEach(r=>{
+    const li=document.createElement('li');
+    li.textContent=`${r.date} / ${r.bean} / ${r.weight}g`;
+    roastListElem.appendChild(li);
+  });
+}
+
+/* ==== utils ==== */
+function sec(){ return Math.floor((Date.now()-roastStartTime)/1000); }
+function format(s){ return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+
+/* ==== DOM ==== */
+const beanName=document.getElementById('beanName');
+const batchWeight=document.getElementById('batchWeight');
+const tempInput=document.getElementById('tempInput');
+const gasDisplay=document.getElementById('gasDisplay');
+const timer=document.getElementById('timer');
+const roastListElem=document.getElementById('roastList');
+const chartCtx=document.getElementById('chart');
+</script>
+
+</body>
+</html>
