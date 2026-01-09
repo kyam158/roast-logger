@@ -4,116 +4,203 @@
 <meta charset="UTF-8">
 <meta name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>焙煎ログ</title>
+<title>Roast Logger</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-/* ===== 全体 ===== */
-body {
-  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-  padding: 16px;
-  margin: 0;
-  touch-action: manipulation;      /* ダブルタップズーム防止 */
-  -webkit-user-select: none;
-  user-select: none;
-  background: #fafafa;
+body{
+  font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+  margin:10px;
+  touch-action:manipulation;
+  -webkit-user-select:none;
+  user-select:none;
 }
-
-/* ===== 見出し ===== */
-h2, h3 {
-  margin-top: 20px;
+button{
+  padding:12px;
+  margin:6px;
+  font-size:16px;
 }
-
-/* ===== ボタン ===== */
-button {
-  padding: 12px;
-  margin: 6px 4px;
-  font-size: 16px;
-  border-radius: 8px;
-  border: none;
-  background: #333;
-  color: #fff;
-  touch-action: manipulation;
-}
-
-button:active {
-  background: #555;
-}
-
-/* ===== 入力欄 ===== */
-input {
-  font-size: 20px;     /* iOSズーム防止（16px以上） */
-  padding: 6px;
-  margin: 4px 0;
-}
-
-/* ===== タイマー表示 ===== */
-#timer {
-  font-size: 36px;
-  margin-top: 10px;
-  font-weight: bold;
-}
-
-/* ===== セクション ===== */
-.section {
-  margin-top: 24px;
-  padding: 12px;
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-}
+input{font-size:20px;}
+#timer{font-size:34px;text-align:center;margin:10px 0;}
+h3{margin-top:20px;}
 </style>
 </head>
 
 <body>
 
-<h2>焙煎ログ</h2>
+<h2>☕ Roast Logger（完成版）</h2>
 
-<!-- ===== タイマー ===== -->
-<div class="section">
-  <h3>タイマー</h3>
-  <button id="startBtn">スタート</button>
-  <div id="timer">0:00</div>
+<div style="text-align:center">
+  <button id="startBtn">焙煎スタート</button>
+</div>
+<div id="timer">00:00</div>
+
+<h3>温度</h3>
+<div style="text-align:center">
+  <button onclick="safeTap(tempDown)">−</button>
+  <input id="tempInput" type="number" value="0"
+         style="width:90px;text-align:center">℃
+  <button onclick="safeTap(tempUp)">＋</button><br><br>
+  <button onclick="safeTap(addTemp)">温度追加</button>
 </div>
 
-<!-- ===== ダミー入力（今後拡張用） ===== -->
-<div class="section">
-  <h3>豆情報</h3>
-  <div>
-    豆名：
-    <input type="text" placeholder="例：エチオピア">
-  </div>
-  <div>
-    バッチ重量(g)：
-    <input type="number" inputmode="decimal">
-  </div>
+<h3>ガス圧</h3>
+<div style="text-align:center">
+  <button onclick="safeTap(gasDown)">−</button>
+  <span id="gasDisplay" style="font-size:24px;margin:0 15px">0.0</span>
+  <button onclick="safeTap(gasUp)">＋</button><br>
+  <button onclick="safeTap(recordGas)">ガス圧記録</button>
 </div>
+
+<h3>フェーズ</h3>
+<div style="text-align:center">
+  <button ontouchstart="startHold('dry')" ontouchend="cancelHold()">Dry End（長押し）</button>
+  <button ontouchstart="startHold('fc')" ontouchend="cancelHold()">1ハゼ（長押し）</button>
+  <button onclick="safeTap(setDrop)">Drop</button>
+</div>
+
+<h3>フェーズ時間</h3>
+<div id="phaseInfo"></div>
+
+<canvas id="chart" height="260"></canvas>
 
 <script>
-/* ===== タイマー処理 ===== */
-let startTime = null;
-let timerInterval = null;
+/* ===== タップ保護 ===== */
+let lastTap=0;
+function safeTap(fn){
+  const n=Date.now();
+  if(n-lastTap<350)return;
+  lastTap=n; fn();
+}
 
-const startBtn = document.getElementById("startBtn");
-const timerEl = document.getElementById("timer");
+/* ===== 状態 ===== */
+let times=[],temps=[],gasLog=[];
+let startTime=null,timerInt=null;
+let currentTemp=0,currentGas=0;
+let dryEndTime=null,firstCrackTime=null,dropTime=null;
+let chart;
 
-startBtn.addEventListener("click", () => {
-  // 二重起動防止
-  if (timerInterval !== null) {
-    clearInterval(timerInterval);
-    timerInterval = null;
-  }
+/* ===== DOM ===== */
+const timer=document.getElementById("timer");
+const tempInput=document.getElementById("tempInput");
+const gasDisplay=document.getElementById("gasDisplay");
 
-  startTime = Date.now();
-
-  timerInterval = setInterval(() => {
-    const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
-    const min = Math.floor(elapsedSec / 60);
-    const sec = elapsedSec % 60;
-
-    timerEl.textContent =
-      `${min}:${sec.toString().padStart(2, "0")}`;
-  }, 1000);
+/* ===== タイマー ===== */
+document.getElementById("startBtn").addEventListener("click",()=>{
+  clearInterval(timerInt);
+  times=[]; temps=[]; gasLog=[];
+  dryEndTime=firstCrackTime=dropTime=null;
+  startTime=Date.now();
+  timerInt=setInterval(updateTimer,1000);
 });
+
+function updateTimer(){
+  const s=sec();
+  timer.textContent=Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
+  updatePhaseInfo();
+}
+
+/* ===== 温度 ===== */
+function tempUp(){currentTemp++;tempInput.value=currentTemp;}
+function tempDown(){currentTemp--;tempInput.value=currentTemp;}
+function addTemp(){
+  times.push(sec());
+  temps.push(currentTemp);
+  drawChart();
+}
+
+/* ===== ガス ===== */
+function gasUp(){
+  currentGas=Math.round((currentGas+0.1)*10)/10;
+  gasDisplay.textContent=currentGas.toFixed(1);
+}
+function gasDown(){
+  currentGas=Math.max(0,Math.round((currentGas-0.1)*10)/10);
+  gasDisplay.textContent=currentGas.toFixed(1);
+}
+function recordGas(){
+  gasLog.push({time:sec(),gas:currentGas});
+  drawChart();
+}
+
+/* ===== フェーズ ===== */
+let holdTimer=null;
+function startHold(t){
+  holdTimer=setTimeout(()=>{
+    if(t==='dry') dryEndTime=sec();
+    if(t==='fc') firstCrackTime=sec();
+    drawChart(); updatePhaseInfo();
+    navigator.vibrate?.(100);
+  },1500);
+}
+function cancelHold(){clearTimeout(holdTimer);}
+function setDrop(){
+  dropTime=sec();
+  clearInterval(timerInt);
+  drawChart(); updatePhaseInfo();
+}
+
+/* ===== フェーズ表示 ===== */
+function updatePhaseInfo(){
+  const el=document.getElementById("phaseInfo");
+  if(!dryEndTime||!firstCrackTime){el.textContent="フェーズ未確定";return;}
+  const total=(dropTime??sec());
+  const dry=dryEndTime;
+  const mail=firstCrackTime-dryEndTime;
+  const dev=total-firstCrackTime;
+  const fmt=s=>Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
+  const pct=s=>(s/total*100).toFixed(1);
+  el.innerHTML=
+    `Dry：${fmt(dry)}（${pct(dry)}％）<br>`+
+    `Maillard：${fmt(mail)}（${pct(mail)}％）<br>`+
+    `Development：${fmt(dev)}（${pct(dev)}％）<br><hr>`+
+    `合計：${fmt(total)}`;
+}
+
+/* ===== グラフ ===== */
+function initChart(){
+  chart=new Chart(document.getElementById("chart"),{
+    type:"line",
+    data:{labels:[],datasets:[]},
+    options:{
+      animation:false,
+      scales:{
+        tempAxis:{position:"left",ticks:{stepSize:5},title:{display:true,text:"Temp"}},
+        rorAxis:{position:"right",ticks:{stepSize:1},grid:{drawOnChartArea:false},title:{display:true,text:"RoR"}},
+        gasAxis:{position:"right",grid:{drawOnChartArea:false},title:{display:true,text:"Gas"}}
+      }
+    }
+  });
+}
+function RoR(){
+  let r=[null];
+  for(let i=1;i<temps.length;i++)
+    r.push((temps[i]-temps[i-1])/((times[i]-times[i-1])/60));
+  return r;
+}
+function gasSeries(){
+  let r=[],g=null,i=0;
+  times.forEach(t=>{
+    while(i<gasLog.length&&gasLog[i].time<=t){g=gasLog[i].gas;i++;}
+    r.push(g);
+  });
+  return r;
+}
+function drawChart(){
+  chart.data.labels=times.map(t=>t/60);
+  chart.data.datasets=[
+    {label:"Temp",data:temps,yAxisID:"tempAxis"},
+    {label:"RoR",data:RoR(),yAxisID:"rorAxis"},
+    {label:"Gas",data:gasSeries(),yAxisID:"gasAxis",stepped:true}
+  ];
+  chart.update();
+}
+
+/* ===== util ===== */
+function sec(){return Math.floor((Date.now()-startTime)/1000);}
+
+/* ===== init ===== */
+initChart();
 </script>
 
 </body>
