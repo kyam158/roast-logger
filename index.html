@@ -3,9 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Roast Logger iPhone</title>
+<title>Roast Logger 完成版</title>
 
-<!-- ★ Chart.js バージョン固定 -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
 <style>
@@ -14,7 +13,6 @@ body {
   max-width: 420px;
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
 }
-
 h2,h3 { text-align:center }
 
 #timer {
@@ -27,7 +25,6 @@ h2,h3 { text-align:center }
 canvas {
   width: 100% !important;
   height: 240px !important;
-  touch-action: none;
 }
 
 button {
@@ -36,6 +33,7 @@ button {
   margin: 6px 0;
   font-size: 20px;
   border-radius: 14px;
+  touch-action: manipulation;
 }
 
 input {
@@ -61,7 +59,7 @@ input {
 
 .drop-btn {
   background: #d32f2f;
-  color: white;
+  color: #fff;
   font-size: 26px;
 }
 </style>
@@ -79,7 +77,7 @@ input {
 
 <button id="startBtn">焙煎スタート</button>
 
-<div id="timer">00:00</div>
+<div id="timer">0:00</div>
 
 <canvas id="chart"></canvas>
 
@@ -120,35 +118,43 @@ let dryEnd=null, fc=null, drop=null;
 let chart;
 let holdTimer=null;
 
-/* ===== ユーティリティ ===== */
+/* ===== utility ===== */
 function sec(){ return Math.floor((Date.now()-startTime)/1000); }
 function fmt(s){ return Math.floor(s/60)+":"+String(s%60).padStart(2,"0"); }
 
-/* ===== スタート ===== */
-startBtn.addEventListener("pointerdown",()=>{
-  startTime=Date.now();
-  times=[0];
-  temps=[Number(chargeTemp.value)];
-  temp=temps[0];
-  gas=Number(chargeGas.value);
-  gasLog=[{time:0,gas}];
-  gasDisp.textContent=gas.toFixed(1);
-  dryEnd=fc=drop=null;
+/* ===== 焙煎開始 ===== */
+function startRoast(){
+  startTime = Date.now();
+  times = [0];
+  temps = [Number(chargeTemp.value)];
+  temp = temps[0];
+  gas = Number(chargeGas.value);
+  gasLog = [{time:0, gas}];
+  gasDisp.textContent = gas.toFixed(1);
+  dryEnd = fc = drop = null;
+
   clearInterval(timerInt);
-  timerInt=setInterval(()=>{
-    timer.textContent=fmt(sec());
+  timer.textContent = "0:00";
+  timerInt = setInterval(()=>{
+    timer.textContent = fmt(sec());
   },1000);
+
   drawChart();
-});
+}
+
+startBtn.addEventListener("pointerdown", startRoast);
+startBtn.addEventListener("click", startRoast);
 
 /* ===== 温度 ===== */
 tempInput.addEventListener("input",e=>{
-  temp=Number(e.target.value);
+  temp = Number(e.target.value);
 });
-
-tempMinus.addEventListener("pointerdown",()=>{ temp--; tempInput.value=temp; });
-tempPlus.addEventListener("pointerdown",()=>{ temp++; tempInput.value=temp; });
-
+tempMinus.addEventListener("pointerdown",()=>{
+  temp--; tempInput.value=temp;
+});
+tempPlus.addEventListener("pointerdown",()=>{
+  temp++; tempInput.value=temp;
+});
 addTemp.addEventListener("pointerdown",()=>{
   times.push(sec());
   temps.push(temp);
