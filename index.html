@@ -12,6 +12,9 @@ body {
   margin: auto;
   max-width: 420px;
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 h2,h3 { text-align:center }
 
@@ -19,7 +22,6 @@ h2,h3 { text-align:center }
   font-size: 48px;
   font-weight: bold;
   text-align: center;
-  margin: 10px 0;
 }
 
 canvas {
@@ -47,20 +49,24 @@ input {
   display: flex;
   gap: 8px;
 }
-
-.temp-row button {
-  flex: 1;
-  font-size: 32px;
-}
-
-.phase-row button {
-  flex: 1;
-}
+.temp-row button { flex:1; font-size:32px }
+.phase-row button { flex:1 }
 
 .drop-btn {
-  background: #d32f2f;
-  color: #fff;
-  font-size: 26px;
+  background:#d32f2f;
+  color:#fff;
+  font-size:26px;
+}
+
+.history {
+  border-top:1px solid #ccc;
+  margin-top:16px;
+  padding-top:8px;
+  font-size:14px;
+}
+.history div {
+  padding:8px;
+  border-bottom:1px solid #eee;
 }
 </style>
 </head>
@@ -110,117 +116,107 @@ input {
 
 <div id="phaseInfo">フェーズ未確定</div>
 
+<h3>焙煎履歴</h3>
+<div id="history" class="history"></div>
+
 <script>
-/* ===== DOM取得（最初にやる） ===== */
-const startBtn   = document.getElementById("startBtn");
-const chargeTemp = document.getElementById("chargeTemp");
-const chargeGas  = document.getElementById("chargeGas");
-const tempInput  = document.getElementById("tempInput");
-const gasDisp    = document.getElementById("gasDisp");
-const timer      = document.getElementById("timer");
-const phaseInfo  = document.getElementById("phaseInfo");
-const chartCtx   = document.getElementById("chart");
-
-const tempMinus  = document.getElementById("tempMinus");
-const tempPlus   = document.getElementById("tempPlus");
-const addTempBtn = document.getElementById("addTemp");
-
-const gasMinus   = document.getElementById("gasMinus");
-const gasPlus    = document.getElementById("gasPlus");
-const gasRecord  = document.getElementById("gasRecord");
-
-const dryBtn     = document.getElementById("dryBtn");
-const fcBtn      = document.getElementById("fcBtn");
-const dropBtn    = document.getElementById("dropBtn");
+/* ===== DOM ===== */
+const $ = id => document.getElementById(id);
+const startBtn=$("startBtn"), chargeTemp=$("chargeTemp"), chargeGas=$("chargeGas");
+const tempInput=$("tempInput"), gasDisp=$("gasDisp"), timer=$("timer");
+const phaseInfo=$("phaseInfo"), chartCtx=$("chart"), historyDiv=$("history");
+const tempMinus=$("tempMinus"), tempPlus=$("tempPlus"), addTempBtn=$("addTemp");
+const gasMinus=$("gasMinus"), gasPlus=$("gasPlus"), gasRecord=$("gasRecord");
+const dryBtn=$("dryBtn"), fcBtn=$("fcBtn"), dropBtn=$("dropBtn");
 
 /* ===== 状態 ===== */
 let startTime, timerInt;
 let times=[], temps=[], gasLog=[];
 let temp=200, gas=0.5;
 let dryEnd=null, fc=null, drop=null;
-let chart;
-let holdTimer;
+let chart, holdTimer;
 
-/* ===== utility ===== */
-const sec = () => Math.floor((Date.now()-startTime)/1000);
-const fmt = s => Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
+/* ===== util ===== */
+const sec=()=>Math.floor((Date.now()-startTime)/1000);
+const fmt=s=>Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
 
 /* ===== 焙煎開始 ===== */
 function startRoast(){
-  startTime = Date.now();
-  times=[0];
-  temps=[Number(chargeTemp.value)];
-  temp=temps[0];
-  gas=Number(chargeGas.value);
+  startTime=Date.now();
+  times=[0]; temps=[Number(chargeTemp.value)];
+  temp=temps[0]; gas=Number(chargeGas.value);
   gasLog=[{time:0,gas}];
   gasDisp.textContent=gas.toFixed(1);
   dryEnd=fc=drop=null;
-
   clearInterval(timerInt);
   timer.textContent="0:00";
   timerInt=setInterval(()=>timer.textContent=fmt(sec()),1000);
-
   drawChart();
 }
-startBtn.addEventListener("pointerdown", startRoast);
-startBtn.addEventListener("click", startRoast);
+startBtn.onclick=startRoast;
 
 /* ===== 温度 ===== */
-tempInput.oninput = e => temp=Number(e.target.value);
-tempMinus.onpointerdown = ()=>{ temp--; tempInput.value=temp; };
-tempPlus.onpointerdown  = ()=>{ temp++; tempInput.value=temp; };
-addTempBtn.onpointerdown = ()=>{
-  times.push(sec());
-  temps.push(temp);
-  drawChart();
-};
+tempInput.oninput=e=>temp=Number(e.target.value);
+tempMinus.onclick=()=>{temp--;tempInput.value=temp};
+tempPlus.onclick=()=>{temp++;tempInput.value=temp};
+addTempBtn.onclick=()=>{times.push(sec());temps.push(temp);drawChart()};
 
 /* ===== ガス ===== */
-gasMinus.onpointerdown = ()=>{
-  gas=Math.max(0,Math.round((gas-0.1)*10)/10);
-  gasDisp.textContent=gas.toFixed(1);
-};
-gasPlus.onpointerdown = ()=>{
-  gas=Math.round((gas+0.1)*10)/10;
-  gasDisp.textContent=gas.toFixed(1);
-};
-gasRecord.onpointerdown = ()=>{
-  gasLog.push({time:sec(),gas});
-  drawChart();
-};
+gasMinus.onclick=()=>{gas=Math.max(0,Math.round((gas-0.1)*10)/10);gasDisp.textContent=gas.toFixed(1)};
+gasPlus.onclick=()=>{gas=Math.round((gas+0.1)*10)/10;gasDisp.textContent=gas.toFixed(1)};
+gasRecord.onclick=()=>{gasLog.push({time:sec(),gas});drawChart()};
 
 /* ===== フェーズ ===== */
 function hold(type){
   holdTimer=setTimeout(()=>{
     if(type==="dry") dryEnd=sec();
     if(type==="fc") fc=sec();
-    navigator.vibrate?.(100);
-    updatePhase();
-    drawChart();
+    updatePhase(); drawChart();
   },1500);
 }
-const cancelHold=()=>clearTimeout(holdTimer);
+const cancel=()=>clearTimeout(holdTimer);
+dryBtn.onpointerdown=e=>{e.preventDefault();hold("dry")};
+dryBtn.onpointerup=cancel;
+fcBtn.onpointerdown=e=>{e.preventDefault();hold("fc")};
+fcBtn.onpointerup=cancel;
 
-dryBtn.onpointerdown=()=>hold("dry");
-dryBtn.onpointerup=cancelHold;
-fcBtn.onpointerdown=()=>hold("fc");
-fcBtn.onpointerup=cancelHold;
-
-/* ===== DROP ===== */
-dropBtn.onpointerdown=()=>{
-  drop=sec();
-  clearInterval(timerInt);
-  updatePhase();
-  drawChart();
+/* ===== DROP & 保存 ===== */
+dropBtn.onclick=()=>{
+  drop=sec(); clearInterval(timerInt);
+  saveHistory();
+  updatePhase(); drawChart(); loadHistory();
 };
+
+/* ===== 履歴保存 ===== */
+function saveHistory(){
+  const list=JSON.parse(localStorage.getItem("roastHistory")||"[]");
+  list.unshift({
+    id:Date.now(),
+    date:new Date().toLocaleString(),
+    chargeTemp:Number(chargeTemp.value),
+    dryEnd,fc,drop,
+    times,temps,gasLog
+  });
+  localStorage.setItem("roastHistory",JSON.stringify(list.slice(0,20)));
+}
+
+/* ===== 履歴表示 ===== */
+function loadHistory(){
+  historyDiv.innerHTML="";
+  const list=JSON.parse(localStorage.getItem("roastHistory")||"[]");
+  list.forEach(r=>{
+    const d=document.createElement("div");
+    d.textContent=`${r.date} / ${fmt(r.drop)} / Dev ${Math.round((r.drop-r.fc)/r.drop*100)}%`;
+    historyDiv.appendChild(d);
+  });
+}
+loadHistory();
 
 /* ===== 表示 ===== */
 function updatePhase(){
-  if(!dryEnd||!fc||!drop){
-    phaseInfo.textContent="フェーズ未確定"; return;
-  }
-  phaseInfo.innerHTML=`
-Dry ${fmt(dryEnd)}<br>
+  if(!dryEnd||!fc||!drop){phaseInfo.textContent="フェーズ未確定";return}
+  phaseInfo.innerHTML=
+`Dry ${fmt(dryEnd)}<br>
 Mai ${fmt(fc-dryEnd)}<br>
 Dev ${fmt(drop-fc)}<hr>
 ${Math.round(dryEnd/drop*100)} /
@@ -232,18 +228,13 @@ ${Math.round((drop-fc)/drop*100)}%`;
 function gasSeries(){
   let g=null,i=0;
   return times.map(t=>{
-    while(i<gasLog.length&&gasLog[i].time<=t){g=gasLog[i++].gas;}
+    while(i<gasLog.length&&gasLog[i].time<=t)g=gasLog[i++].gas;
     return g;
   });
 }
 function drawChart(){
   const labels=times.map(fmt);
-  if(!chart){
-    chart=new Chart(chartCtx,{
-      type:"line",
-      data:{labels,datasets:[]}
-    });
-  }
+  if(!chart) chart=new Chart(chartCtx,{type:"line",data:{labels,datasets:[]}});
   chart.data.labels=labels;
   chart.data.datasets=[
     {label:"Temp",data:temps},
