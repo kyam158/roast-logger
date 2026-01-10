@@ -33,7 +33,7 @@ button{
 <div id="wrap">
 
 <div id="chartWrap">
-<canvas id="chart"></canvas>
+  <canvas id="chart"></canvas>
 </div>
 
 <button id="startBtn">焙煎開始</button>
@@ -46,9 +46,7 @@ button{
 /* ===== 状態 ===== */
 let startTime=null,timerInt;
 let times=[],temps=[];
-let temp=150;
-let gas=50;
-let gasLog=[];
+let temp=200;
 let dryEnd=null,fc=null,drop=null;
 
 /* ===== util ===== */
@@ -108,20 +106,24 @@ const phaseLabelPlugin={
   }
 };
 
-/* ===== 背景生成 ===== */
+/* ===== 背景・縦線 ===== */
 function phaseBg(s,e,color){
   if(s==null||e==null) return null;
   const d=Array(times.length).fill(null);
-  for(let i=s;i<=e&&i<d.length;i++) d[i]=300;
+  for(let i=s;i<=e&&i<d.length;i++) d[i]=260;
   return {
-    data:d,fill:true,backgroundColor:color,borderWidth:0,
-    pointRadius:0,order:-10
+    data:d,
+    fill:true,
+    backgroundColor:color,
+    borderWidth:0,
+    pointRadius:0,
+    order:-10
   };
 }
 function phaseLine(t){
   if(t==null) return [];
   const d=Array(times.length).fill(null);
-  if(t<d.length) d[t]=300;
+  if(t<d.length) d[t]=260;
   return d;
 }
 
@@ -133,8 +135,14 @@ const chart=new Chart(ctx,{
   options:{
     animation:false,
     scales:{
-      y:{min:0,max:260},
-      yG:{position:"right",grid:{drawOnChartArea:false}}
+      x:{
+        min:0,
+        max:600   // ★ 常に10分表示
+      },
+      y:{
+        min:0,
+        max:260
+      }
     }
   },
   plugins:[phaseLabelPlugin]
@@ -161,10 +169,17 @@ function startRoast(){
   times=Array.from({length:601},(_,i)=>i);
   temps=Array(601).fill(null);
   temps[0]=temp;
-  gasLog=[];
   dryEnd=fc=drop=null;
+
   clearInterval(timerInt);
-  timerInt=setInterval(drawChart,1000);
+  timerInt=setInterval(()=>{
+    const t=sec();
+    if(t<temps.length){
+      temps[t]=200 - t*0.1; // ★ 確認用の仮温度
+    }
+    drawChart();
+  },1000);
+
   drawChart();
 }
 startBtn.onclick=startRoast;
@@ -187,7 +202,6 @@ dryBtn.onpointercancel=cancelHold;
 fcBtn.onpointerdown=e=>{e.preventDefault();hold("fc");};
 fcBtn.onpointerup=cancelHold;
 fcBtn.onpointercancel=cancelHold;
-
 </script>
 </body>
 </html>
