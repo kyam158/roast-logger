@@ -57,9 +57,9 @@ function currentPhase(){
 /* ===== 背景 ===== */
 function bg(s,e,color){
   if(s==null) return null;
-  const end=e??sec();
-  const d=Array(times.length).fill(null);
-  for(let i=s;i<=end&&i<d.length;i++) d[i]=300;
+  const end = e ?? (times.length - 1);
+  const d = Array(times.length).fill(null);
+  for(let i=s;i<=end && i<d.length;i++) d[i]=300;
   return {
     label:"",
     data:d,
