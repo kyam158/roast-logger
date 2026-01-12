@@ -2,80 +2,121 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Roast Logger CORE</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Roast Logger</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+
 <style>
-body{font-family:-apple-system;background:#fafafa;margin:0;padding:10px}
-#time{font-size:28px;text-align:center;margin:8px 0}
-button,input{width:100%;padding:12px;margin:6px 0;font-size:16px}
+body{
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+  background:#fafafa;
+}
+#wrap{padding:10px}
+#chartWrap{height:45vh}
+button,input{
+  width:100%;
+  padding:12px;
+  margin:6px 0;
+  font-size:16px;
+}
+.row{display:flex;gap:6px}
+.row>*{flex:1}
+#dropBtn{background:#d32f2f;color:#fff;font-weight:bold}
+#time{text-align:center;font-size:22px;margin:8px 0}
 </style>
 </head>
 
 <body>
+<div id="wrap">
 
-<canvas id="chart" height="300"></canvas>
+<div id="chartWrap"><canvas id="chart"></canvas></div>
 <div id="time">0:00</div>
 
-<button id="start">焙煎開始</button>
-<input id="temp" type="number" value="150">
-<input id="gas" type="range" min="0" max="5" step="0.5" value="2.5">
-<button id="drop">DROP</button>
+<button id="startBtn">焙煎開始</button>
+
+<label>豆温 (℃)</label>
+<div class="row">
+  <input id="tempInput" type="number" value="150">
+  <button id="tempSet">決定</button>
+</div>
+
+<label>ガス圧 (<span id="gasLabel">2.5</span>)</label>
+<input id="gasInput" type="range" min="0" max="5" step="0.5" value="2.5">
+
+<button id="dropBtn">DROP</button>
+
+</div>
 
 <script>
-let timer = null;
-let startTime = 0;
+let startTime=null,timer=null,ended=false;
+let temps=[],gases=[];
+let temp=150,gas=2.5;
 
-const temps = [];
-const gases = [];
+const time=document.getElementById("time");
 
-const fmt = s => `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
+const fmt=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
+const sec=()=>ended?ended:Math.floor((Date.now()-startTime)/1000);
 
-const chart = new Chart(document.getElementById("chart"),{
+const chart=new Chart(document.getElementById("chart"),{
   type:"line",
   data:{
     datasets:[
-      {label:"Temp",data:[],borderWidth:2},
-      {label:"Gas",data:[],borderDash:[4,4],yAxisID:"yR"}
+      {label:"Temp",borderWidth:2,data:[]},
+      {label:"Gas",borderDash:[4,4],yAxisID:"yR",data:[]}
     ]
   },
   options:{
     animation:false,
     scales:{
-      x:{type:"linear",min:0,max:600},
+      x:{type:"linear",min:0},
       y:{min:0,max:260},
       yR:{position:"right",min:0,max:5,grid:{drawOnChartArea:false}}
     }
   }
 });
 
-function draw(t){
-  time.textContent = fmt(t);
-  chart.data.datasets[0].data = temps;
-  chart.data.datasets[1].data = gases;
+function draw(){
+  const t=sec();
+  time.textContent=fmt(t);
+
+  chart.options.scales.x.max = t < 60 ? 60 : t + 10;
+
+  chart.data.datasets[0].data = temps.map((v,i)=>v!=null?{x:i,y:v}:null);
+  chart.data.datasets[1].data = gases.map((v,i)=>v!=null?{x:i,y:v}:null);
   chart.update();
 }
 
-start.onclick = () => {
-  if(timer) return;          // ← 二重起動防止（重要）
-  temps.length = 0;
-  gases.length = 0;
-  startTime = Date.now();
-
-  timer = setInterval(()=>{
-    const t = Math.floor((Date.now()-startTime)/1000);
-    temps.push({x:t,y:+temp.value});
-    gases.push({x:t,y:+gas.value});
-    draw(t);
-  },1000);
+startBtn.onclick=()=>{
+  startTime=Date.now();
+  ended=false;
+  temps=[];gases=[];
+  temps[0]=temp;
+  gases[0]=gas;
+  clearInterval(timer);
+  timer=setInterval(draw,1000);
+  draw();
 };
 
-drop.onclick = () => {
-  if(!timer) return;
+tempSet.onclick=()=>{
+  temp=parseInt(tempInput.value);
+  temps[sec()]=temp;
+  draw();
+};
+
+gasInput.oninput=()=>{
+  gas=parseFloat(gasInput.value);
+  gasLabel.textContent=gas.toFixed(1);
+  gases[sec()]=gas;
+  draw();
+};
+
+dropBtn.onclick=()=>{
+  if(!startTime||ended) return;
+  ended=sec();
   clearInterval(timer);
-  timer = null;              // ← 完全停止
+  draw();
 };
 </script>
-
 </body>
 </html>
