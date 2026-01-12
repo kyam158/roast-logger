@@ -15,6 +15,12 @@ body{
 }
 #wrap{padding:10px}
 #chartWrap{height:45vh}
+#time{
+  font-size:28px;
+  font-weight:bold;
+  text-align:center;
+  margin:8px 0;
+}
 button,input{
   width:100%;
   padding:12px;
@@ -25,14 +31,6 @@ button,input{
 .row>*{flex:1}
 label{font-size:13px;color:#555}
 #dropBtn{background:#d32f2f;color:#fff;font-weight:bold}
-#history div{
-  padding:8px;
-  border-bottom:1px solid #ddd;
-}
-.smallBtn{
-  font-size:12px;
-  padding:4px;
-}
 </style>
 </head>
 
@@ -40,6 +38,7 @@ label{font-size:13px;color:#555}
 <div id="wrap">
 
 <div id="chartWrap"><canvas id="chart"></canvas></div>
+<div id="time">0:00</div>
 
 <button id="startBtn">焙煎開始</button>
 
@@ -56,67 +55,48 @@ label{font-size:13px;color:#555}
 <button id="fcBtn">1ハゼ（長押し）</button>
 <button id="dropBtn">DROP</button>
 
-<h3>履歴</h3>
-<div id="history"></div>
-
 </div>
 
 <script>
-/* ===== 状態 ===== */
-const KEY="roastHistory";
-let startTime=null,timer=null,replay=false;
-let temp=150, gas=2.5;
-let dryEnd=null,fc=null,drop=null;
+let startTime=null,timer=null;
+let temp=150,gas=2.5;
 let temps=[],gases=[],rors=[];
+let dryEnd=null,fc=null,drop=null;
 
-/* ===== util ===== */
 const sec=()=>startTime?Math.floor((Date.now()-startTime)/1000):0;
 const fmt=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
 
-/* ===== RoR ===== */
 function calcRoR(){
   rors=[];
   for(let i=30;i<temps.length;i++){
-    if(temps[i]!=null && temps[i-30]!=null){
+    if(temps[i]!=null&&temps[i-30]!=null){
       rors.push({x:i,y:(temps[i]-temps[i-30])*2});
     }
   }
 }
 
-/* ===== フェーズ ===== */
-function phaseInfo(){
-  const t=sec();
-  if(fc && t>=fc) return {name:"DEVELOPMENT",color:"#e53935",start:fc,dur:drop?drop-fc:0};
-  if(dryEnd && t>=dryEnd) return {name:"MAILLARD",color:"#fb8c00",start:dryEnd,dur:fc?fc-dryEnd:t-dryEnd};
-  if(startTime) return {name:"DRYING",color:"#fbc02d",start:0,dur:dryEnd?dryEnd:t};
-  return null;
+/* ===== フェーズ情報 ===== */
+function phases(){
+  return [
+    {s:0,e:dryEnd,c:"#fbc02d"},
+    {s:dryEnd,e:fc,c:"#fb8c00"},
+    {s:fc,e:drop,c:"#e53935"}
+  ];
 }
 
 /* ===== Chart Plugin ===== */
 const phasePlugin={
   id:"phase",
   beforeDraw(chart){
-    const p=phaseInfo();
-    if(!p) return;
     const {ctx,chartArea,scales}=chart;
     ctx.save();
-
-    // 背景
-    const x0=scales.x.getPixelForValue(p.start);
-    const x1=scales.x.getPixelForValue(sec());
-    ctx.fillStyle=p.color+"33";
-    ctx.fillRect(x0,chartArea.top,x1-x0,chartArea.bottom-chartArea.top);
-
-    // ラベル
-    ctx.fillStyle=p.color;
-    ctx.font="bold 14px sans-serif";
-    ctx.fillText(p.name,chartArea.left+6,chartArea.top+6);
-
-    const e=sec()-p.start;
-    const pct=p.dur?Math.round(e/p.dur*100):0;
-    ctx.font="12px sans-serif";
-    ctx.fillStyle="#555";
-    ctx.fillText(`${fmt(e)} (${pct}%)`,chartArea.left+6,chartArea.top+24);
+    phases().forEach(p=>{
+      if(p.s==null||p.e==null) return;
+      const x0=scales.x.getPixelForValue(p.s);
+      const x1=scales.x.getPixelForValue(p.e);
+      ctx.fillStyle=p.c+"33";
+      ctx.fillRect(x0,chartArea.top,x1-x0,chartArea.bottom-chartArea.top);
+    });
     ctx.restore();
   },
   afterDraw(chart){
@@ -125,36 +105,25 @@ const phasePlugin={
     if(dryEnd!=null){
       const x=scales.x.getPixelForValue(dryEnd);
       ctx.strokeStyle="#fbc02d";
-      ctx.beginPath();
-      ctx.moveTo(x,chartArea.top);
-      ctx.lineTo(x,chartArea.bottom);
-      ctx.stroke();
+      ctx.beginPath();ctx.moveTo(x,chartArea.top);ctx.lineTo(x,chartArea.bottom);ctx.stroke();
     }
     if(fc!=null){
       const x=scales.x.getPixelForValue(fc);
       ctx.strokeStyle="#e64a19";
-      ctx.beginPath();
-      ctx.moveTo(x,chartArea.top);
-      ctx.lineTo(x,chartArea.bottom);
-      ctx.stroke();
+      ctx.beginPath();ctx.moveTo(x,chartArea.top);ctx.lineTo(x,chartArea.bottom);ctx.stroke();
     }
     ctx.restore();
   }
 };
 
 /* ===== Chart ===== */
-const chart=new Chart(document.getElementById("chart"),{
+const chart=new Chart(chartWrap.firstChild,{
   type:"line",
   data:{datasets:[]},
   options:{
     animation:false,
     scales:{
-      x:{
-        type:"linear",
-        min:0,
-        max:600,
-        ticks:{stepSize:60,callback:v=>fmt(v)}
-      },
+      x:{type:"linear",min:0,max:600,ticks:{stepSize:60,callback:v=>fmt(v)}},
       y:{min:0,max:260},
       yR:{position:"right",min:-10,max:10,grid:{drawOnChartArea:false}}
     }
@@ -165,115 +134,49 @@ const chart=new Chart(document.getElementById("chart"),{
 /* ===== 描画 ===== */
 function draw(){
   const t=sec();
+  time.textContent=fmt(t);
   chart.options.scales.x.max=t>600?900:600;
 
   chart.data.datasets=[
     {label:"Temp",data:temps.map((v,i)=>v!=null?{x:i,y:v}:null),borderWidth:2},
     {label:"RoR",data:rors,borderColor:"#7b1fa2",yAxisID:"yR"},
-    {label:"Gas",data:gases.map((v,i)=>v!=null?{x:i,y:v}:null),borderColor:"#1976d2",borderDash:[4,4],yAxisID:"yR"}
+    {label:"Gas",data:gases.map((v,i)=>v!=null?{x:i,y:v}:null),borderDash:[4,4],yAxisID:"yR"}
   ];
   chart.update();
 }
 
 /* ===== 焙煎開始 ===== */
 startBtn.onclick=()=>{
-  replay=false;
   startTime=Date.now();
   dryEnd=fc=drop=null;
   temps=[];gases=[];rors=[];
-  temps[0]=temp;
-  gases[0]=gas;
   clearInterval(timer);
-  timer=setInterval(draw,1000);
-  draw();
+  timer=setInterval(()=>{
+    const t=sec();
+    temps[t]=temp;
+    gases[t]=gas;
+    calcRoR();
+    draw();
+  },1000);
 };
 
 /* ===== 入力 ===== */
-tempSet.onclick=()=>{
-  temp=parseInt(tempInput.value);
-  temps[sec()]=temp;
-  calcRoR(); draw();
-};
+tempSet.onclick=()=>temp=parseInt(tempInput.value);
 gasInput.oninput=()=>{
   gas=parseFloat(gasInput.value);
   gasLabel.textContent=gas.toFixed(1);
-  gases[sec()]=gas;
-  draw();
 };
 
 /* ===== 長押し ===== */
 let hold=null;
-const startHold=fn=>hold=setTimeout(fn,600);
+const startHold=f=>hold=setTimeout(f,600);
 const cancelHold=()=>clearTimeout(hold);
-dryBtn.onpointerdown=e=>{e.preventDefault();startHold(()=>{dryEnd=sec();});};
-fcBtn.onpointerdown=e=>{e.preventDefault();startHold(()=>{fc=sec();});};
+dryBtn.onpointerdown=e=>{e.preventDefault();startHold(()=>dryEnd=sec());};
+fcBtn.onpointerdown=e=>{e.preventDefault();startHold(()=>fc=sec());};
 [dryBtn,fcBtn].forEach(b=>{b.onpointerup=cancelHold;b.onpointercancel=cancelHold;});
 
-/* ===== DROP & 履歴 ===== */
-dropBtn.onclick=()=>{
-  if(!startTime||drop||!fc) return;
-  drop=sec();
-  saveHistory();
-};
-
-function loadHistory(){
-  return JSON.parse(localStorage.getItem(KEY)||"[]");
-}
-function saveHistory(){
-  const h=loadHistory();
-  h.unshift({
-    id:Date.now(),
-    name:"",
-    date:new Date().toLocaleString(),
-    drop,dryEnd,fc,
-    temps:[...temps],
-    gases:[...gases]
-  });
-  localStorage.setItem(KEY,JSON.stringify(h));
-  renderHistory();
-}
-function renderHistory(){
-  const h=loadHistory();
-  history.innerHTML=h.length?h.map((r,i)=>`
-    <div>
-      <b onclick="replayHistory(${i})">${r.name||"（名称未設定）"}</b><br>
-      <small>${r.date}</small>
-      <div class="row">
-        <button class="smallBtn" onclick="editName(${i})">🖊</button>
-        <button class="smallBtn" onclick="delHistory(${i})">🗑</button>
-      </div>
-    </div>
-  `).join(""):"履歴なし";
-}
-function editName(i){
-  const h=loadHistory();
-  const n=prompt("焙煎名",h[i].name||"");
-  if(n!==null){
-    h[i].name=n;
-    localStorage.setItem(KEY,JSON.stringify(h));
-    renderHistory();
-  }
-}
-function delHistory(i){
-  if(confirm("削除しますか？")){
-    const h=loadHistory();
-    h.splice(i,1);
-    localStorage.setItem(KEY,JSON.stringify(h));
-    renderHistory();
-  }
-}
-function replayHistory(i){
-  const r=loadHistory()[i];
-  replay=true;
-  clearInterval(timer);
-  startTime=Date.now()-r.drop*1000;
-  temps=[...r.temps];
-  gases=[...r.gases];
-  calcRoR();
-  draw();
-}
-
-renderHistory();
+/* ===== DROP ===== */
+dropBtn.onclick=()=>{ if(startTime&&!drop) drop=sec(); };
 </script>
 </body>
 </html>
