@@ -63,120 +63,100 @@ let temp=150,gas=2.5;
 let temps=[],gases=[],rors=[];
 let dryEnd=null,fc=null,drop=null;
 
-const sec=()=>startTime?Math.floor((Date.now()-startTime)/1000):0;
+/* util */
+const sec=()=>Math.floor((Date.now()-startTime)/1000);
 const fmt=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
 
+/* RoR */
 function calcRoR(){
   rors=[];
   for(let i=30;i<temps.length;i++){
-    if(temps[i]!=null&&temps[i-30]!=null){
-      rors.push({x:i,y:(temps[i]-temps[i-30])*2});
-    }
-  }
-}
-
-/* ===== フェーズ情報 ===== */
-function phases(){
-  return [
-    {s:0,e:dryEnd,c:"#fbc02d"},
-    {s:dryEnd,e:fc,c:"#fb8c00"},
-    {s:fc,e:drop,c:"#e53935"}
-  ];
-}
-
-/* ===== Chart Plugin ===== */
-const phasePlugin={
-  id:"phase",
-  beforeDraw(chart){
-    const {ctx,chartArea,scales}=chart;
-    ctx.save();
-    phases().forEach(p=>{
-      if(p.s==null||p.e==null) return;
-      const x0=scales.x.getPixelForValue(p.s);
-      const x1=scales.x.getPixelForValue(p.e);
-      ctx.fillStyle=p.c+"33";
-      ctx.fillRect(x0,chartArea.top,x1-x0,chartArea.bottom-chartArea.top);
+    rors.push({
+      x:temps[i].x,
+      y:(temps[i].y-temps[i-30].y)*2
     });
-    ctx.restore();
-  },
-  afterDraw(chart){
-    const {ctx,scales,chartArea}=chart;
-    ctx.save();
-    if(dryEnd!=null){
-      const x=scales.x.getPixelForValue(dryEnd);
-      ctx.strokeStyle="#fbc02d";
-      ctx.beginPath();ctx.moveTo(x,chartArea.top);ctx.lineTo(x,chartArea.bottom);ctx.stroke();
-    }
-    if(fc!=null){
-      const x=scales.x.getPixelForValue(fc);
-      ctx.strokeStyle="#e64a19";
-      ctx.beginPath();ctx.moveTo(x,chartArea.top);ctx.lineTo(x,chartArea.bottom);ctx.stroke();
-    }
-    ctx.restore();
   }
-};
+}
 
-/* ===== Chart ===== */
-const chart=new Chart(chartWrap.firstChild,{
+/* Chart */
+const chart=new Chart(document.getElementById("chart"),{
   type:"line",
-  data:{datasets:[]},
+  data:{
+    datasets:[
+      {label:"Temp",data:[],borderWidth:2},
+      {label:"RoR",data:[],yAxisID:"yR",borderColor:"#7b1fa2"},
+      {label:"Gas",data:[],yAxisID:"yR",borderDash:[4,4]}
+    ]
+  },
   options:{
     animation:false,
     scales:{
-      x:{type:"linear",min:0,max:600,ticks:{stepSize:60,callback:v=>fmt(v)}},
+      x:{
+        type:"linear",
+        min:0,
+        max:600,
+        ticks:{stepSize:60,callback:v=>fmt(v)}
+      },
       y:{min:0,max:260},
       yR:{position:"right",min:-10,max:10,grid:{drawOnChartArea:false}}
     }
-  },
-  plugins:[phasePlugin]
+  }
 });
 
-/* ===== 描画 ===== */
+/* draw */
 function draw(){
   const t=sec();
   time.textContent=fmt(t);
-  chart.options.scales.x.max=t>600?900:600;
+  chart.options.scales.x.max = t>600 ? 900 : 600;
 
-  chart.data.datasets=[
-    {label:"Temp",data:temps.map((v,i)=>v!=null?{x:i,y:v}:null),borderWidth:2},
-    {label:"RoR",data:rors,borderColor:"#7b1fa2",yAxisID:"yR"},
-    {label:"Gas",data:gases.map((v,i)=>v!=null?{x:i,y:v}:null),borderDash:[4,4],yAxisID:"yR"}
-  ];
+  chart.data.datasets[0].data = temps;
+  chart.data.datasets[1].data = rors;
+  chart.data.datasets[2].data = gases;
+
   chart.update();
 }
 
-/* ===== 焙煎開始 ===== */
+/* start */
 startBtn.onclick=()=>{
   startTime=Date.now();
-  dryEnd=fc=drop=null;
   temps=[];gases=[];rors=[];
+  dryEnd=fc=drop=null;
   clearInterval(timer);
   timer=setInterval(()=>{
     const t=sec();
-    temps[t]=temp;
-    gases[t]=gas;
-    calcRoR();
+    temps.push({x:t,y:temp});
+    gases.push({x:t,y:gas});
+    if(temps.length>30) calcRoR();
     draw();
   },1000);
 };
 
-/* ===== 入力 ===== */
+/* input */
 tempSet.onclick=()=>temp=parseInt(tempInput.value);
 gasInput.oninput=()=>{
   gas=parseFloat(gasInput.value);
   gasLabel.textContent=gas.toFixed(1);
 };
 
-/* ===== 長押し ===== */
+/* long press */
 let hold=null;
 const startHold=f=>hold=setTimeout(f,600);
 const cancelHold=()=>clearTimeout(hold);
 dryBtn.onpointerdown=e=>{e.preventDefault();startHold(()=>dryEnd=sec());};
 fcBtn.onpointerdown=e=>{e.preventDefault();startHold(()=>fc=sec());};
-[dryBtn,fcBtn].forEach(b=>{b.onpointerup=cancelHold;b.onpointercancel=cancelHold;});
+[dryBtn,fcBtn].forEach(b=>{
+  b.onpointerup=cancelHold;
+  b.onpointercancel=cancelHold;
+});
 
-/* ===== DROP ===== */
-dropBtn.onclick=()=>{ if(startTime&&!drop) drop=sec(); };
+/* DROP */
+dropBtn.onclick=()=>{
+  if(!timer) return;
+  drop=sec();
+  clearInterval(timer);
+  timer=null;
+  draw();
+};
 </script>
 </body>
 </html>
