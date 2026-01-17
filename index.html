@@ -75,8 +75,8 @@ const fmt=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
 
 /* ===== 時間軸 ===== */
 function ensureRange(){
-  const target=sec()>600?900:600;
-  while(times.length-1<target){
+  const target = sec()>600 ? 900 : 600;
+  while(times.length-1 < target){
     times.push(times.length);
     temps.push(null);
     rors.push(null);
@@ -88,7 +88,7 @@ function ensureRange(){
 function calcRoR(){
   rors.fill(null);
   for(let i=30;i<temps.length;i++){
-    if(temps[i]!=null&&temps[i-30]!=null){
+    if(temps[i]!=null && temps[i-30]!=null){
       rors[i]=(temps[i]-temps[i-30])*2;
     }
   }
@@ -102,8 +102,8 @@ function phaseInfo(name,color,start,dur){
 }
 function currentPhase(){
   const t=sec();
-  if(fc&&t>=fc) return phaseInfo("DEVELOPMENT","#e53935",fc,drop?drop-fc:0);
-  if(dryEnd&&t>=dryEnd) return phaseInfo("MAILLARD","#fb8c00",dryEnd,fc?fc-dryEnd:t-dryEnd);
+  if(fc && t>=fc) return phaseInfo("DEVELOPMENT","#e53935",fc,drop?drop-fc:0);
+  if(dryEnd && t>=dryEnd) return phaseInfo("MAILLARD","#fb8c00",dryEnd,fc?fc-dryEnd:t-dryEnd);
   if(startTime) return phaseInfo("DRYING","#fbc02d",0,dryEnd?dryEnd:t);
   return null;
 }
@@ -133,6 +133,11 @@ const chart=new Chart(document.getElementById("chart"),{
       }
     },
     scales:{
+      x:{
+        ticks:{
+          callback:(value,index)=> index%60===0 ? fmt(index) : ""
+        }
+      },
       y:{min:0,max:260,title:{display:true,text:"Temp"}},
       yR:{position:"right",min:-10,max:10,grid:{drawOnChartArea:false}}
     }
@@ -142,7 +147,7 @@ const chart=new Chart(document.getElementById("chart"),{
 /* ===== 描画 ===== */
 function draw(){
   ensureRange();
-  chart.data.labels=times.map(t=>t%60===0?fmt(t):"");
+  chart.data.labels = times.map(fmt);
   chart.data.datasets=[
     {label:"Temp",data:temps,borderWidth:2,yAxisID:"y"},
     {label:"RoR",data:rors,borderColor:"#7b1fa2",yAxisID:"yR"},
