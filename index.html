@@ -15,7 +15,6 @@ button,input{width:100%;padding:12px;margin:6px 0;font-size:16px}
 .row>*{flex:1}
 #dropBtn{background:#d32f2f;color:#fff;font-weight:bold}
 #time{text-align:center;font-size:22px;margin:4px 0}
-#phase{text-align:center;font-size:14px;color:#555}
 </style>
 </head>
 
@@ -23,7 +22,6 @@ button,input{width:100%;padding:12px;margin:6px 0;font-size:16px}
 <div id="wrap">
   <div id="chartWrap"><canvas id="chart"></canvas></div>
   <div id="time">0:00</div>
-  <div id="phase">—</div>
 
   <button id="startBtn">焙煎開始</button>
 
@@ -51,6 +49,23 @@ const tempData=[], gasData=[];
 const fmt=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
 const nowSec=()=>endTime ?? Math.floor((Date.now()-startTime)/1000);
 
+/* ===== フェーズ判定 ===== */
+function getPhase(t){
+  if(fc!=null && t>=fc){
+    const dur = endTime ? endTime-fc : t-fc;
+    return {name:"DEVELOPMENT",color:"#e53935",bg:"rgba(229,57,53,.15)",start:fc,dur};
+  }
+  if(dryEnd!=null && t>=dryEnd){
+    const dur = fc ? fc-dryEnd : t-dryEnd;
+    return {name:"MAILLARD",color:"#fb8c00",bg:"rgba(251,140,0,.18)",start:dryEnd,dur};
+  }
+  if(startTime){
+    const dur = dryEnd ? dryEnd : t;
+    return {name:"DRYING",color:"#fbc02d",bg:"rgba(251,192,45,.22)",start:0,dur};
+  }
+  return null;
+}
+
 /* ===== Chart ===== */
 const chart = new Chart(
   document.getElementById("chart"),
@@ -68,15 +83,39 @@ const chart = new Chart(
         x:{type:"linear",min:0},
         y:{min:0,max:260},
         yR:{position:"right",min:0,max:5,grid:{drawOnChartArea:false}}
-      },
-      plugins:{legend:{display:true}}
+      }
     },
     plugins:[{
-      id:"markers",
+      id:"phaseOverlay",
+      beforeDraw(c){
+        const t=nowSec();
+        const p=getPhase(t);
+        if(!p) return;
+        const {ctx,chartArea,scales}=c;
+        ctx.save();
+
+        // 背景
+        const x0=scales.x.getPixelForValue(p.start);
+        const x1=scales.x.getPixelForValue(t);
+        ctx.fillStyle=p.bg;
+        ctx.fillRect(x0,chartArea.top,x1-x0,chartArea.bottom-chartArea.top);
+
+        // フェーズ表示
+        ctx.fillStyle=p.color;
+        ctx.font="bold 14px sans-serif";
+        ctx.fillText(p.name,chartArea.left+6,chartArea.top+6);
+
+        const elapsed=t-p.start;
+        const pct=p.dur?Math.min(100,Math.round(elapsed/p.dur*100)):0;
+        ctx.font="12px sans-serif";
+        ctx.fillStyle="#555";
+        ctx.fillText(`${fmt(elapsed)} (${pct}%)`,chartArea.left+6,chartArea.top+24);
+
+        ctx.restore();
+      },
       afterDraw(c){
         const {ctx,scales,chartArea}=c;
         ctx.save();
-
         function vline(t,color){
           if(t==null) return;
           const x=scales.x.getPixelForValue(t);
@@ -86,35 +125,18 @@ const chart = new Chart(
           ctx.lineTo(x,chartArea.bottom);
           ctx.stroke();
         }
-
         vline(dryEnd,"#fbc02d");
         vline(fc,"#e65100");
-
         ctx.restore();
       }
     }]
   }
 );
 
-/* ===== フェーズ ===== */
-function updatePhase(t){
-  if(fc!=null && t>=fc){
-    phase.textContent=`DEVELOPMENT ${fmt(t-fc)}`;
-  }else if(dryEnd!=null && t>=dryEnd){
-    phase.textContent=`MAILLARD ${fmt(t-dryEnd)}`;
-  }else if(startTime){
-    phase.textContent=`DRYING ${fmt(t)}`;
-  }else{
-    phase.textContent="—";
-  }
-}
-
 /* ===== 描画 ===== */
 function draw(){
   const t=nowSec();
   time.textContent=fmt(t);
-  updatePhase(t);
-
   chart.options.scales.x.max=Math.max(600,t+10);
   chart.data.datasets[0].data=tempData;
   chart.data.datasets[1].data=gasData;
@@ -141,7 +163,6 @@ tempSet.onclick=()=>{
   tempData.push({x:nowSec(),y:temp});
   draw();
 };
-
 gasInput.oninput=()=>{
   gas=parseFloat(gasInput.value);
   gasLabel.textContent=gas.toFixed(1);
