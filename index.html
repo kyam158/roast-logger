@@ -46,16 +46,18 @@ small{color:#555}
 </div>
 
 <script>
+/* ===== 状態 ===== */
 const KEY="roastHistory";
 let startTime=null,endTime=null,timer=null;
 let temp=150,gas=2.5;
 let dryEnd=null,fc=null;
 let tempData=[], gasData=[];
 
+/* ===== util ===== */
 const fmt=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
 const nowSec=()=> endTime ?? Math.floor((Date.now()-startTime)/1000);
 
-/* ===== フェーズ計算 ===== */
+/* ===== フェーズ集計 ===== */
 function phaseSummary(){
   if(!endTime||dryEnd==null||fc==null) return null;
   const total=endTime;
@@ -99,7 +101,7 @@ function draw(){
   chart.update();
 }
 
-/* ===== 開始 ===== */
+/* ===== 焙煎開始 ===== */
 startBtn.onclick=()=>{
   startTime=Date.now();
   endTime=null;
@@ -113,7 +115,7 @@ startBtn.onclick=()=>{
 
 /* ===== 入力 ===== */
 tempSet.onclick=()=>{
-  temp=parseInt(tempInput.value);
+  temp=parseInt(tempInput.value)||temp;
   tempData.push({x:nowSec(),y:temp});
   draw();
 };
@@ -136,7 +138,7 @@ fcBtn.onpointerdown=e=>{e.preventDefault();startHold(()=>fc=nowSec());};
   b.onpointercancel=cancelHold;
 });
 
-/* ===== DROP & 履歴 ===== */
+/* ===== DROP & 履歴保存 ===== */
 dropBtn.onclick=()=>{
   if(!startTime||endTime) return;
   endTime=nowSec();
@@ -145,6 +147,7 @@ dropBtn.onclick=()=>{
   draw();
 };
 
+/* ===== 履歴 ===== */
 function loadHistory(){
   return JSON.parse(localStorage.getItem(KEY)||"[]");
 }
@@ -154,7 +157,8 @@ function saveHistory(){
     date:new Date().toLocaleString(),
     dryEnd,fc,end:endTime,
     phases:phaseSummary(),
-    tempData,gasData
+    tempData:[...tempData],
+    gasData:[...gasData]
   });
   localStorage.setItem(KEY,JSON.stringify(h));
   renderHistory();
@@ -164,11 +168,13 @@ function renderHistory(){
   history.innerHTML=h.length?h.map((r,i)=>`
     <div>
       <b onclick="replay(${i})">${r.date}</b><br>
+      ${r.phases?`
       <small>
         DRY ${fmt(r.phases.drying.t)} (${r.phases.drying.p}%) /
         MAIL ${fmt(r.phases.maillard.t)} (${r.phases.maillard.p}%) /
         DEV ${fmt(r.phases.dev.t)} (${r.phases.dev.p}%)
-      </small>
+      </small>`:
+      `<small>フェーズ未確定</small>`}
     </div>
   `).join(""):"履歴なし";
 }
@@ -179,8 +185,8 @@ function replay(i){
   endTime=r.end;
   dryEnd=r.dryEnd;
   fc=r.fc;
-  tempData=r.tempData;
-  gasData=r.gasData;
+  tempData=[...r.tempData];
+  gasData=[...r.gasData];
   draw();
 }
 
