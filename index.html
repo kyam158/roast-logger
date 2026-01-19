@@ -14,10 +14,8 @@ button,input{width:100%;padding:12px;margin:6px 0;font-size:16px}
 .row{display:flex;gap:6px}
 .row>*{flex:1}
 #dropBtn{background:#d32f2f;color:#fff;font-weight:bold}
+#csvBtn{background:#1976d2;color:#fff}
 #time{text-align:center;font-size:22px;margin:6px 0}
-#phase{text-align:center;font-size:14px;color:#555}
-#history div{padding:8px;border-bottom:1px solid #ddd}
-small{color:#555}
 </style>
 </head>
 
@@ -25,7 +23,6 @@ small{color:#555}
 <div id="wrap">
   <div id="chartWrap"><canvas id="chart"></canvas></div>
   <div id="time">0:00</div>
-  <div id="phase">DRYING</div>
 
   <button id="startBtn">焙煎開始</button>
 
@@ -38,37 +35,32 @@ small{color:#555}
   <label>ガス圧 (<span id="gasLabel">2.5</span>)</label>
   <input id="gasInput" type="range" min="0" max="5" step="0.5" value="2.5">
 
-  <button id="dryBtn">Dry End</button>
-  <button id="fcBtn">1ハゼ</button>
+  <button id="dryBtn">Dry End（長押し）</button>
+  <button id="fcBtn">1ハゼ（長押し）</button>
   <button id="dropBtn">DROP</button>
 
-  <h3>履歴</h3>
-  <div id="history"></div>
+  <button id="csvBtn">CSV書き出し</button>
 </div>
 
 <script>
 /* =====================
    状態
 ===================== */
-const KEY="roastHistory";
 let startTime=null,endTime=null,timer=null;
 let temp=150,gas=2.5;
 let dryEnd=null,fc=null;
-let tempData=[],gasData=[];
+const tempData=[],gasData=[];
 
 /* =====================
    util
 ===================== */
-const fmt=s=>s==null?"--:--":`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
-const nowSec=()=>{
-  if(!startTime) return null;
-  return endTime ?? Math.floor((Date.now()-startTime)/1000);
-};
+const fmt=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
+const nowSec=()=> endTime ?? Math.floor((Date.now()-startTime)/1000);
 
 /* =====================
    Chart
 ===================== */
-const chart=new Chart(document.getElementById("chart"),{
+const chart=new Chart(chart,{
   type:"line",
   data:{datasets:[
     {label:"Temp",data:[],borderWidth:2},
@@ -89,117 +81,97 @@ const chart=new Chart(document.getElementById("chart"),{
 ===================== */
 function draw(){
   const t=nowSec();
-  if(t==null) return;
-
   time.textContent=fmt(t);
   chart.options.scales.x.max=Math.max(600,t+10);
   chart.data.datasets[0].data=tempData;
   chart.data.datasets[1].data=gasData;
   chart.update();
-
-  if(fc!=null) phase.textContent="DEVELOPMENT";
-  else if(dryEnd!=null) phase.textContent="MAILLARD";
-  else phase.textContent="DRYING";
 }
 
 /* =====================
-   開始
+   操作
 ===================== */
 startBtn.onclick=()=>{
   startTime=Date.now();
   endTime=null;
   dryEnd=fc=null;
-  tempData=[{x:0,y:temp}];
-  gasData=[{x:0,y:gas}];
+  tempData.length=0;
+  gasData.length=0;
+  tempData.push({x:0,y:temp});
+  gasData.push({x:0,y:gas});
   clearInterval(timer);
   timer=setInterval(draw,1000);
   draw();
 };
 
-/* =====================
-   入力
-===================== */
 tempSet.onclick=()=>{
-  const t=nowSec(); if(t==null) return;
   temp=parseInt(tempInput.value)||temp;
-  tempData.push({x:t,y:temp});
+  tempData.push({x:nowSec(),y:temp});
   draw();
 };
 
 gasInput.oninput=()=>{
-  const t=nowSec(); if(t==null) return;
   gas=parseFloat(gasInput.value);
   gasLabel.textContent=gas.toFixed(1);
-  gasData.push({x:t,y:gas});
+  gasData.push({x:nowSec(),y:gas});
   draw();
 };
 
-/* =====================
-   フェーズ
-===================== */
-dryBtn.onclick=()=>{ if(startTime && dryEnd==null) dryEnd=nowSec(); };
-fcBtn.onclick=()=>{ if(startTime && fc==null) fc=nowSec(); };
+/* 長押し */
+let hold=null;
+const holdStart=f=>hold=setTimeout(f,600);
+const holdCancel=()=>clearTimeout(hold);
 
-/* =====================
-   DROP
-===================== */
+dryBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>dryEnd=nowSec());};
+fcBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>fc=nowSec());};
+[dryBtn,fcBtn].forEach(b=>{
+  b.onpointerup=holdCancel;
+  b.onpointercancel=holdCancel;
+});
+
+/* DROP */
 dropBtn.onclick=()=>{
-  if(!startTime || endTime!=null) return;
-  const t=nowSec();
-  if(t==null || t<=0) return;
-
-  endTime=t;
+  if(!startTime||endTime) return;
+  endTime=nowSec();
   clearInterval(timer);
-  saveHistory();
   draw();
 };
 
 /* =====================
-   履歴
+   CSV書き出し
 ===================== */
-function loadHistory(){
-  return JSON.parse(localStorage.getItem(KEY)||"[]");
-}
+csvBtn.onclick=()=>{
+  if(!tempData.length) return alert("データがありません");
 
-function saveHistory(){
-  const h=loadHistory();
-  h.unshift({
-    date:new Date().toLocaleString(),
-    dryEnd,fc,end:endTime,
-    tempData:[...tempData],
-    gasData:[...gasData]
+  let csv = [];
+  csv.push("# Roast Logger CSV");
+  csv.push(`# DryEnd,${dryEnd ?? ""}`);
+  csv.push(`# FirstCrack,${fc ?? ""}`);
+  csv.push(`# Drop,${endTime ?? ""}`);
+  csv.push("time(sec),temp(C),gas");
+
+  // 時間をキーにマージ
+  const map={};
+  tempData.forEach(d=>{
+    map[d.x]=map[d.x]||{};
+    map[d.x].temp=d.y;
   });
-  localStorage.setItem(KEY,JSON.stringify(h));
-  renderHistory();
-}
+  gasData.forEach(d=>{
+    map[d.x]=map[d.x]||{};
+    map[d.x].gas=d.y;
+  });
 
-function renderHistory(){
-  const h=loadHistory();
-  history.innerHTML=h.length?h.map((r,i)=>`
-    <div onclick="replay(${i})">
-      <b>${r.date}</b><br>
-      <small>
-        Dry ${fmt(r.dryEnd)} /
-        1C ${fmt(r.fc)} /
-        End ${fmt(r.end)}
-      </small>
-    </div>
-  `).join(""):"履歴なし";
-}
+  Object.keys(map).sort((a,b)=>a-b).forEach(t=>{
+    const r=map[t];
+    csv.push(`${t},${r.temp??""},${r.gas??""}`);
+  });
 
-function replay(i){
-  const r=loadHistory()[i];
-  clearInterval(timer);
-  startTime=Date.now()-r.end*1000;
-  endTime=r.end;
-  dryEnd=r.dryEnd;
-  fc=r.fc;
-  tempData=[...r.tempData];
-  gasData=[...r.gasData];
-  draw();
-}
-
-renderHistory();
+  const blob=new Blob([csv.join("\n")],{type:"text/csv"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=`roast_${new Date().toISOString().slice(0,19)}.csv`;
+  a.click();
+};
 </script>
 </body>
 </html>
