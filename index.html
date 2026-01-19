@@ -46,15 +46,12 @@ small{color:#555}
 </div>
 
 <script>
-/* ===== 状態 ===== */
 const KEY="roastHistory";
 let startTime=null,endTime=null,timer=null;
 let temp=150,gas=2.5;
 let dryEnd=null,fc=null;
-
 let tempData=[], gasData=[];
 
-/* ===== util ===== */
 const fmt=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
 const nowSec=()=> endTime ?? Math.floor((Date.now()-startTime)/1000);
 
@@ -62,35 +59,35 @@ const nowSec=()=> endTime ?? Math.floor((Date.now()-startTime)/1000);
 function phaseSummary(){
   if(!endTime||dryEnd==null||fc==null) return null;
   const total=endTime;
-  const d0=dryEnd;
-  const d1=fc-dryEnd;
-  const d2=endTime-fc;
   const pct=v=>Math.round(v/total*100);
   return {
-    drying:{t:d0,p:pct(d0)},
-    maillard:{t:d1,p:pct(d1)},
-    dev:{t:d2,p:pct(d2)}
+    drying:{t:dryEnd,p:pct(dryEnd)},
+    maillard:{t:fc-dryEnd,p:pct(fc-dryEnd)},
+    dev:{t:endTime-fc,p:pct(endTime-fc)}
   };
 }
 
 /* ===== Chart ===== */
-const chart=new Chart(chartElem,{
-  type:"line",
-  data:{
-    datasets:[
-      {label:"Temp",data:[],borderWidth:2},
-      {label:"Gas",data:[],yAxisID:"yR",borderDash:[4,4]}
-    ]
-  },
-  options:{
-    animation:false,
-    scales:{
-      x:{type:"linear",min:0},
-      y:{min:0,max:260},
-      yR:{position:"right",min:0,max:5,grid:{drawOnChartArea:false}}
+const chart=new Chart(
+  document.getElementById("chart"),
+  {
+    type:"line",
+    data:{
+      datasets:[
+        {label:"Temp",data:[],borderWidth:2},
+        {label:"Gas",data:[],yAxisID:"yR",borderDash:[4,4]}
+      ]
+    },
+    options:{
+      animation:false,
+      scales:{
+        x:{type:"linear",min:0},
+        y:{min:0,max:260},
+        yR:{position:"right",min:0,max:5,grid:{drawOnChartArea:false}}
+      }
     }
   }
-});
+);
 
 /* ===== 描画 ===== */
 function draw(){
@@ -148,19 +145,15 @@ dropBtn.onclick=()=>{
   draw();
 };
 
-/* ===== 履歴 ===== */
 function loadHistory(){
   return JSON.parse(localStorage.getItem(KEY)||"[]");
 }
 function saveHistory(){
-  const p=phaseSummary();
   const h=loadHistory();
   h.unshift({
-    id:Date.now(),
-    name:"",
     date:new Date().toLocaleString(),
     dryEnd,fc,end:endTime,
-    phases:p,
+    phases:phaseSummary(),
     tempData,gasData
   });
   localStorage.setItem(KEY,JSON.stringify(h));
@@ -170,37 +163,14 @@ function renderHistory(){
   const h=loadHistory();
   history.innerHTML=h.length?h.map((r,i)=>`
     <div>
-      <b onclick="replay(${i})">${r.name||"（名称未設定）"}</b><br>
-      <small>${r.date}</small><br>
-      ${r.phases?`
+      <b onclick="replay(${i})">${r.date}</b><br>
       <small>
         DRY ${fmt(r.phases.drying.t)} (${r.phases.drying.p}%) /
         MAIL ${fmt(r.phases.maillard.t)} (${r.phases.maillard.p}%) /
         DEV ${fmt(r.phases.dev.t)} (${r.phases.dev.p}%)
-      </small>`:""}
-      <div class="row">
-        <button class="smallBtn" onclick="edit(${i})">✏️</button>
-        <button class="smallBtn" onclick="del(${i})">🗑</button>
-      </div>
+      </small>
     </div>
   `).join(""):"履歴なし";
-}
-function edit(i){
-  const h=loadHistory();
-  const n=prompt("焙煎名",h[i].name||"");
-  if(n!==null){
-    h[i].name=n;
-    localStorage.setItem(KEY,JSON.stringify(h));
-    renderHistory();
-  }
-}
-function del(i){
-  if(confirm("削除しますか？")){
-    const h=loadHistory();
-    h.splice(i,1);
-    localStorage.setItem(KEY,JSON.stringify(h));
-    renderHistory();
-  }
 }
 function replay(i){
   const r=loadHistory()[i];
