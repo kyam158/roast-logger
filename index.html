@@ -37,6 +37,7 @@ button,input{width:100%;padding:12px;margin:6px 0;font-size:16px}
   <button id="dryBtn">Dry End</button>
   <button id="fcBtn">1ハゼ</button>
   <button id="dropBtn">DROP</button>
+  <button id="saveBtn">グラフ保存（PNG）</button>
 </div>
 
 <script>
@@ -170,6 +171,22 @@ dropBtn.onclick=()=>{
   endTime=nowSec();
   clearInterval(timer);
   draw();
+};
+  /* =====================
+   グラフ保存（PNG）
+===================== */
+saveBtn.onclick = () => {
+  const url = chart.toBase64Image("image/png", 1);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `roast_graph_${new Date()
+    .toISOString()
+    .replace(/[:.]/g,"-")}.png`;
+
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 };
 </script>
 </body>
