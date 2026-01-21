@@ -175,18 +175,51 @@ dropBtn.onclick=()=>{
   /* =====================
    グラフ保存（PNG）
 ===================== */
+<input id="roastName" placeholder="焙煎名（例：Brazil Light）">
+  /* =====================
+   グラフ保存（焙煎名焼き込み）
+===================== */
 saveBtn.onclick = () => {
-  const url = chart.toBase64Image("image/png", 1);
+  const canvas = chart.canvas;
+  const ctx = canvas.getContext("2d");
 
+  // 焙煎名
+  const name = roastName.value || "Roast Logger";
+
+  // 元の状態保存
+  ctx.save();
+
+  // 半透明背景
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.fillRect(0, 0, canvas.width, 50);
+
+  // テキスト
+  ctx.fillStyle = "#000";
+  ctx.font = "bold 20px sans-serif";
+  ctx.textBaseline = "middle";
+  ctx.fillText(name, 12, 25);
+
+  // 時刻も入れる（任意）
+  ctx.font = "12px sans-serif";
+  ctx.fillStyle = "#555";
+  ctx.fillText(
+    new Date().toLocaleString(),
+    canvas.width - 160,
+    25
+  );
+
+  // PNG生成
+  const url = canvas.toDataURL("image/png", 1);
+
+  // 元に戻す
+  ctx.restore();
+  chart.update();
+
+  // ダウンロード
   const a = document.createElement("a");
   a.href = url;
-  a.download = `roast_graph_${new Date()
-    .toISOString()
-    .replace(/[:.]/g,"-")}.png`;
-
-  document.body.appendChild(a);
+  a.download = `roast_${name.replace(/\s+/g,"_")}.png`;
   a.click();
-  document.body.removeChild(a);
 };
 </script>
 </body>
