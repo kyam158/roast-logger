@@ -72,7 +72,16 @@ const chart=new Chart(document.getElementById("chart"),{
   options:{
     animation:false,
     scales:{
-      x:{type:"linear",min:0},
+      x:{
+  type:"linear",
+  min:0,
+  ticks:{
+    callback:value => {
+      // 秒 → 分 に変換して整数表示
+      return Math.floor(value / 60);
+    }
+  }
+},
       y:{min:0,max:260},
       yR:{position:"right",min:0,max:5,grid:{drawOnChartArea:false}}
     }
