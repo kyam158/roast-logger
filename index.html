@@ -37,6 +37,7 @@ button,input{width:100%;padding:12px;margin:6px 0;font-size:16px}
   <button id="dryBtn">Dry End</button>
   <button id="fcBtn">1ハゼ</button>
   <button id="dropBtn">DROP</button>
+  <input id="roastName" placeholder="焙煎名（例：Ethiopia Light Roast）">
   <button id="saveBtn">グラフ保存（PNG）</button>
 </div>
 
@@ -187,6 +188,50 @@ saveBtn.onclick = () => {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+};
+  saveBtn.onclick = () => {
+
+  // ===== 1. Canvas取得 =====
+  const canvas = chart.canvas;
+  const ctx = canvas.getContext("2d");
+
+  // ===== 2. 焙煎名 =====
+  const roast = roastName.value.trim() || "Roast Logger";
+
+  // ===== 3. 現在の描画状態を保存 =====
+  ctx.save();
+
+  // ===== 4. 上部に白い帯を描く =====
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.fillRect(0, 0, canvas.width, 52);
+
+  // ===== 5. 焙煎名を書く =====
+  ctx.fillStyle = "#000";
+  ctx.font = "bold 20px -apple-system, BlinkMacSystemFont";
+  ctx.textBaseline = "middle";
+  ctx.fillText(roast, 12, 26);
+
+  // ===== 6. 日時を書く =====
+  ctx.font = "12px sans-serif";
+  ctx.fillStyle = "#555";
+  ctx.fillText(
+    new Date().toLocaleString(),
+    canvas.width - 170,
+    26
+  );
+
+  // ===== 7. PNG化 =====
+  const png = canvas.toDataURL("image/png", 1);
+
+  // ===== 8. 描画を元に戻す =====
+  ctx.restore();
+  chart.update();
+
+  // ===== 9. ダウンロード =====
+  const a = document.createElement("a");
+  a.href = png;
+  a.download = `roast_${roast.replace(/\s+/g,"_")}.png`;
+  a.click();
 };
 </script>
 </body>
