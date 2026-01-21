@@ -76,10 +76,8 @@ const chart=new Chart(document.getElementById("chart"),{
   type:"linear",
   min:0,
   ticks:{
-    callback:value => {
-      // 秒 → 分 に変換して整数表示
-      return Math.floor(value / 60);
-    }
+    stepSize:60,              // ← 1分刻み（超重要）
+    callback:value => value / 60
   }
 },
       y:{min:0,max:260},
