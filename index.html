@@ -55,7 +55,11 @@ let temp=150,gas=2.5;
 let dryEnd=null,fc=null;
 const tempData=[],gasData=[];
 
-const fmt=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
+const fmt = s => {
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}分${sec}秒`;
+};
 const nowSec=()=>endTime ?? Math.floor((Date.now()-startTime)/1000);
 
 /* ===== Chart ===== */
