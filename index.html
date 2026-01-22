@@ -78,9 +78,9 @@ const chart=new Chart(document.getElementById("chart"),{
   type:"linear",
   min:0,
   ticks:{
-    stepSize:60,              // ← 1分刻み（超重要）
-    callback:value => value / 60
-  }
+  stepSize:60,
+  callback:value => `${value/60}分`
+}
 },
       y:{min:0,max:260},
       yR:{position:"right",min:0,max:5,grid:{drawOnChartArea:false}}
@@ -263,10 +263,12 @@ const devRate =
   Object.keys(map).sort((a,b)=>a-b).forEach(t=>{
   const phase = getPhaseByTime(Number(t));
 
-csv.push(
-  `${secToMinSec(Number(t))},${map[t].t ?? ""},${map[t].g ?? ""},${phase}`
-);
-  });
+csv.push([
+  secToMinSec(Number(t)),
+  map[t].t ?? "",
+  map[t].g ?? "",
+  phase
+].join(","));
   const blob=new Blob([csv.join("\n")],{type:"text/csv"});
   const a=document.createElement("a");
   a.href=URL.createObjectURL(blob);
