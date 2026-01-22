@@ -257,24 +257,26 @@ const devRate =
   `# DevelopmentRate,${devRate??""}`,
   "time,temperature,gas,phase"
 ];
-  const map={};
-  tempData.forEach(d=>{map[d.x]=map[d.x]||{};map[d.x].t=d.y});
-  gasData.forEach(d=>{map[d.x]=map[d.x]||{};map[d.x].g=d.y});
-  Object.keys(map).sort((a,b)=>a-b).forEach(t=>{
+    Object.keys(map).sort((a,b)=>a-b).forEach(t=>{
   const phase = getPhaseByTime(Number(t));
 
-csv.push([
-  secToMinSec(Number(t)),
-  map[t].t ?? "",
-  map[t].g ?? "",
-  phase
-].join(","));
-  const blob=new Blob([csv.join("\n")],{type:"text/csv"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download=`roast_${Date.now()}.csv`;
-  a.click();
-};
+  csv.push([
+    secToMinSec(Number(t)),
+    map[t].t ?? "",
+    map[t].g ?? "",
+    phase
+  ].join(","));
+});
+
+// ← forEach が終わってから CSV を保存する
+const blob = new Blob([csv.join("\n")], { type: "text/csv" });
+const a = document.createElement("a");
+a.href = URL.createObjectURL(blob);
+a.download = `roast_${Date.now()}.csv`;
+a.click();
+  const map={};
+  tempData.forEach(d=>{map[d.x]=map[d.x]||{};map[d.x].t=d.y});
+  gasData.forEach(d=>{map[d.x]=map[d.x]||{};map[d.x].g=
 </script>
 </body>
 </html>
