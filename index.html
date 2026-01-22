@@ -214,13 +214,15 @@ csvBtn.onclick=()=>{
   tempData.forEach(d=>{map[d.x]=map[d.x]||{};map[d.x].t=d.y});
   gasData.forEach(d=>{map[d.x]=map[d.x]||{};map[d.x].g=d.y});
   Object.keys(map).sort((a,b)=>a-b).forEach(t=>{
-    csv.push(`${t},${map[t].t??""},${map[t].g??""}`);
+  csv.push(`${secToMinSec(Number(t))},${map[t].t??""},${map[t].g??""}`);
   });
   const blob=new Blob([csv.join("\n")],{type:"text/csv"});
   const a=document.createElement("a");
   a.href=URL.createObjectURL(blob);
   a.download=`roast_${Date.now()}.csv`;
   a.click();
+  const secToMinSec = s =>
+  `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
 };
 </script>
 </body>
