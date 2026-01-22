@@ -86,7 +86,8 @@ const chart=new Chart(document.getElementById("chart"),{
       yR:{position:"right",min:0,max:5,grid:{drawOnChartArea:false}}
     }
   },
-  plugins:[{
+  plugins:[
+  {
     id:"markers",
     afterDraw(c){
       const {ctx,scales,chartArea}=c;
@@ -103,36 +104,38 @@ const chart=new Chart(document.getElementById("chart"),{
       vline(dryEnd,"#fbc02d");
       vline(fc,"#e65100");
       ctx.restore();
-    },
-    {
-  id:"devText",
-  afterDraw(chart){
-    if(fc==null || endTime==null) return;
+    }
+  },
+  {
+    id:"devText",
+    afterDraw(chart){
+      if(fc==null || endTime==null) return;
 
-    const ctx = chart.ctx;
-    const {top,left} = chart.chartArea;
+      const ctx = chart.ctx;
+      const {top,left} = chart.chartArea;
 
-    const devTime = endTime - fc;
-    const devRate = (devTime / endTime * 100).toFixed(1);
+      const devTime = endTime - fc;
+      const devRate = (devTime / endTime * 100).toFixed(1);
 
-    const m = Math.floor(devTime / 60);
-    const s = devTime % 60;
+      const m = Math.floor(devTime / 60);
+      const s = devTime % 60;
 
-    ctx.save();
-    ctx.fillStyle = "#e53935";
-    ctx.font = "bold 14px sans-serif";
-    ctx.fillText("DEVELOPMENT", left + 6, top + 16);
+      ctx.save();
+      ctx.fillStyle = "#e53935";
+      ctx.font = "bold 14px sans-serif";
+      ctx.fillText("DEVELOPMENT", left + 6, top + 16);
 
-    ctx.fillStyle = "#333";
-    ctx.font = "13px sans-serif";
-    ctx.fillText(
-      `${m}:${String(s).padStart(2,"0")} (${devRate}%)`,
-      left + 6,
-      top + 34
-    );
-    ctx.restore();
+      ctx.fillStyle = "#333";
+      ctx.font = "13px sans-serif";
+      ctx.fillText(
+        `${m}:${String(s).padStart(2,"0")} (${devRate}%)`,
+        left + 6,
+        top + 34
+      );
+      ctx.restore();
+    }
   }
-}
+]
   }]
 
 /* ===== 描画 ===== */
@@ -252,7 +255,7 @@ const devRate =
   `# Drop,${endTime??""}`,
   `# DevelopmentTime,${devTime??""}`,
   `# DevelopmentRate,${devRate??""}`,
-  "time,temperature,gas"
+  "time,temperature,gas,phase"
 ];
   const map={};
   tempData.forEach(d=>{map[d.x]=map[d.x]||{};map[d.x].t=d.y});
