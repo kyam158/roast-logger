@@ -234,49 +234,64 @@ imgBtn.onclick=()=>{
 };
 
 /* ===== CSV ===== */
+<script>
+/* ===== CSV ===== */
 function getPhaseByTime(t){
   if(fc != null && t >= fc) return "DEVELOPMENT";
   if(dryEnd != null && t >= dryEnd) return "MAILLARD";
   return "DRYING";
 }
-  csvBtn.onclick=()=>{
+
+csvBtn.onclick = () => {
   if(!tempData.length) return alert("データなし");
+
   const devTime =
-  (fc!=null && endTime!=null) ? (endTime - fc) : null;
+    (fc!=null && endTime!=null) ? (endTime - fc) : null;
 
-const devRate =
-  (devTime!=null && endTime>0)
-    ? (devTime / endTime * 100).toFixed(1)
-    : null;
-   let csv=[
-  "# Roast Logger CSV",
-  `# DryEnd,${dryEnd??""}`,
-  `# FirstCrack,${fc??""}`,
-  `# Drop,${endTime??""}`,
-  `# DevelopmentTime,${devTime??""}`,
-  `# DevelopmentRate,${devRate??""}`,
-  "time,temperature,gas,phase"
-];
-    Object.keys(map).sort((a,b)=>a-b).forEach(t=>{
-  const phase = getPhaseByTime(Number(t));
+  const devRate =
+    (devTime!=null && endTime>0)
+      ? (devTime / endTime * 100).toFixed(1)
+      : null;
 
-  csv.push([
-    secToMinSec(Number(t)),
-    map[t].t ?? "",
-    map[t].g ?? "",
-    phase
-  ].join(","));
-});
+  let csv = [
+    "# Roast Logger CSV",
+    `# DryEnd,${dryEnd ?? ""}`,
+    `# FirstCrack,${fc ?? ""}`,
+    `# Drop,${endTime ?? ""}`,
+    `# DevelopmentTime,${devTime ?? ""}`,
+    `# DevelopmentRate,${devRate ?? ""}`,
+    "time,temperature,gas,phase"
+  ];
 
-// ← forEach が終わってから CSV を保存する
-const blob = new Blob([csv.join("\n")], { type: "text/csv" });
-const a = document.createElement("a");
-a.href = URL.createObjectURL(blob);
-a.download = `roast_${Date.now()}.csv`;
-a.click();
-  const map={};
-  tempData.forEach(d=>{map[d.x]=map[d.x]||{};map[d.x].t=d.y});
-  gasData.forEach(d=>{map[d.x]=map[d.x]||{};map[d.x].g=
+  /* ★ ① まず map を作る */
+  const map = {};
+  tempData.forEach(d=>{
+    map[d.x] = map[d.x] || {};
+    map[d.x].t = d.y;
+  });
+  gasData.forEach(d=>{
+    map[d.x] = map[d.x] || {};
+    map[d.x].g = d.y;
+  });
+
+  /* ★ ② map を使って CSV 行を作る */
+  Object.keys(map).sort((a,b)=>a-b).forEach(t=>{
+    const phase = getPhaseByTime(Number(t));
+    csv.push([
+      secToMinSec(Number(t)),
+      map[t].t ?? "",
+      map[t].g ?? "",
+      phase
+    ].join(","));
+  });
+
+  /* ★ ③ 最後に保存 */
+  const blob = new Blob([csv.join("\n")], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `roast_${Date.now()}.csv`;
+  a.click();
+};
 </script>
 </body>
 </html>
