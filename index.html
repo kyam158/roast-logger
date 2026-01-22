@@ -203,20 +203,29 @@ imgBtn.onclick=()=>{
 };
 
 /* ===== CSV ===== */
-csvBtn.onclick=()=>{
+function getPhaseByTime(t){
+  if(fc != null && t >= fc) return "DEVELOPMENT";
+  if(dryEnd != null && t >= dryEnd) return "MAILLARD";
+  return "DRYING";
+}
+  csvBtn.onclick=()=>{
   if(!tempData.length) return alert("データなし");
   let csv=[
-    "# Roast Logger CSV",
-    `# DryEnd,${dryEnd??""}`,
-    `# FirstCrack,${fc??""}`,
-    `# Drop,${endTime??""}`,
-    "time,temperature,gas"
-  ];
+  "# Roast Logger CSV",
+  `# DryEnd,${dryEnd ?? ""}`,
+  `# FirstCrack,${fc ?? ""}`,
+  `# Drop,${endTime ?? ""}`,
+  "time,temperature,gas,phase"
+];
   const map={};
   tempData.forEach(d=>{map[d.x]=map[d.x]||{};map[d.x].t=d.y});
   gasData.forEach(d=>{map[d.x]=map[d.x]||{};map[d.x].g=d.y});
   Object.keys(map).sort((a,b)=>a-b).forEach(t=>{
-  csv.push(`${secToMinSec(Number(t))},${map[t].t??""},${map[t].g??""}`);
+  const phase = getPhaseByTime(Number(t));
+
+csv.push(
+  `${secToMinSec(Number(t))},${map[t].t ?? ""},${map[t].g ?? ""},${phase}`
+);
   });
   const blob=new Blob([csv.join("\n")],{type:"text/csv"});
   const a=document.createElement("a");
