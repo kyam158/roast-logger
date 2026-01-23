@@ -17,18 +17,12 @@ button,input{width:100%;padding:12px;margin:6px 0;font-size:16px}
 #imgBtn{background:#2e7d32;color:#fff}
 #csvBtn{background:#1976d2;color:#fff}
 #time{text-align:center;font-size:22px;margin:6px 0}
-  #chartWrap canvas {
-  width: 100% !important;
-  height: 100% !important;
-}
 </style>
 </head>
 
 <body>
 <div id="wrap">
-  <div id="chartWrap">
-  <canvas id="chart" height="300"></canvas>
-</div>
+  <div id="chartWrap"><canvas id="chart"></canvas></div>
   <div id="time">0:00</div>
 
   <button id="startBtn">焙煎開始</button>
@@ -56,19 +50,6 @@ button,input{width:100%;padding:12px;margin:6px 0;font-size:16px}
 </div>
 
 <script>
-  <script>
-/* ===== DOM取得（Safari必須）===== */
-const time = document.getElementById("time");
-const startBtn = document.getElementById("startBtn");
-const tempInput = document.getElementById("tempInput");
-const tempSet = document.getElementById("tempSet");
-const gasInput = document.getElementById("gasInput");
-const gasLabel = document.getElementById("gasLabel");
-const dryBtn = document.getElementById("dryBtn");
-const fcBtn = document.getElementById("fcBtn");
-const dropBtn = document.getElementById("dropBtn");
-const imgBtn = document.getElementById("imgBtn");
-const csvBtn = document.getElementById("csvBtn");
 let startTime=null,endTime=null,timer=null;
 let temp=150,gas=2.5;
 let dryEnd=null,fc=null;
@@ -79,10 +60,7 @@ const fmt = s => {
   const sec = s % 60;
   return `${m}分${sec}秒`;
 };
-  const nowSec = () => {
-  if (!startTime) return 0;
-  return endTime ?? Math.floor((Date.now() - startTime) / 1000);
-};
+const nowSec=()=>endTime ?? Math.floor((Date.now()-startTime)/1000);
 /* ===== util ===== */
 const secToMinSec = s =>
   `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
@@ -94,10 +72,8 @@ const chart=new Chart(document.getElementById("chart"),{
     {label:"Gas",data:[],yAxisID:"yR",borderDash:[4,4]}
   ]},
   options:{
-  responsive: true,           // ★追加
-  maintainAspectRatio: false, // ★追加（これが無いとiPhoneで消える）
-  animation:false,
-  scales:{
+    animation:false,
+    scales:{
       x:{
   type:"linear",
   min:0,
@@ -159,8 +135,8 @@ const chart=new Chart(document.getElementById("chart"),{
       ctx.restore();
     }
   }
-  }
-});
+]
+  }]
 
 /* ===== 描画 ===== */
 function draw(){
