@@ -82,66 +82,38 @@ const chart=new Chart(
       }
     },
 
-plugins:[
-  {
-    id:"phaseMarkers",
-    afterDraw(chart){
-      const {ctx,scales,chartArea}=chart;
+    /* ★ ここから追加 */
+    plugins:[
+      {
+        id:"phaseMarkers",
+        afterDraw(chart){
+          const {ctx,scales,chartArea}=chart;
 
-      function drawLine(t,color,label){
-        if(t==null) return;
-        const x=scales.x.getPixelForValue(t);
-        ctx.save();
-        ctx.strokeStyle=color;
-        ctx.lineWidth=2;
-        ctx.beginPath();
-        ctx.moveTo(x,chartArea.top);
-        ctx.lineTo(x,chartArea.bottom);
-        ctx.stroke();
+          function drawLine(t,color,label){
+            if(t==null) return;
+            const x=scales.x.getPixelForValue(t);
+            ctx.save();
+            ctx.strokeStyle=color;
+            ctx.lineWidth=2;
+            ctx.beginPath();
+            ctx.moveTo(x,chartArea.top);
+            ctx.lineTo(x,chartArea.bottom);
+            ctx.stroke();
 
-        ctx.fillStyle=color;
-        ctx.font="12px sans-serif";
-        ctx.fillText(label, x+4, chartArea.top+12);
-        ctx.restore();
+            ctx.fillStyle=color;
+            ctx.font="12px sans-serif";
+            ctx.fillText(label, x+4, chartArea.top+12);
+            ctx.restore();
+          }
+
+          drawLine(dryEnd,"#f9a825","Dry End");
+          drawLine(fc,"#e65100","1st Crack");
+        }
       }
-
-      drawLine(dryEnd,"#f9a825","Dry End");
-      drawLine(fc,"#e65100","1st Crack");
-    }
-  },
-
-  /* ★ Development表示 ここから */
-  {
-    id:"developmentText",
-    afterDraw(chart){
-      if(fc==null || endTime==null) return;
-
-      const ctx = chart.ctx;
-      const {top,left} = chart.chartArea;
-
-      const devTime = endTime - fc;
-      const devRate = (devTime / endTime * 100).toFixed(1);
-
-      const m = Math.floor(devTime / 60);
-      const s = devTime % 60;
-
-      ctx.save();
-      ctx.fillStyle = "#e53935";
-      ctx.font = "bold 14px sans-serif";
-      ctx.fillText("DEVELOPMENT", left + 6, top + 16);
-
-      ctx.fillStyle = "#333";
-      ctx.font = "13px sans-serif";
-      ctx.fillText(
-        `${m}:${String(s).padStart(2,"0")} (${devRate}%)`,
-        left + 6,
-        top + 34
-      );
-      ctx.restore();
-    }
+    ]
+    /* ★ ここまで */
   }
-  /* ★ ここまで */
-]
+);
 /* =====================
    操作
 ===================== */
