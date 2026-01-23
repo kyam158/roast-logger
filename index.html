@@ -17,6 +17,10 @@ button,input{width:100%;padding:12px;margin:6px 0;font-size:16px}
 #imgBtn{background:#2e7d32;color:#fff}
 #csvBtn{background:#1976d2;color:#fff}
 #time{text-align:center;font-size:22px;margin:6px 0}
+  #chartWrap canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
 </style>
 </head>
 
@@ -72,8 +76,10 @@ const chart=new Chart(document.getElementById("chart"),{
     {label:"Gas",data:[],yAxisID:"yR",borderDash:[4,4]}
   ]},
   options:{
-    animation:false,
-    scales:{
+  responsive: true,           // ★追加
+  maintainAspectRatio: false, // ★追加（これが無いとiPhoneで消える）
+  animation:false,
+  scales:{
       x:{
   type:"linear",
   min:0,
