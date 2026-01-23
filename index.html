@@ -80,10 +80,40 @@ const chart=new Chart(
         y:{min:0,max:260},
         yR:{position:"right",min:0,max:5,grid:{drawOnChartArea:false}}
       }
-    }
+    },
+
+    /* ★ ここから追加 */
+    plugins:[
+      {
+        id:"phaseMarkers",
+        afterDraw(chart){
+          const {ctx,scales,chartArea}=chart;
+
+          function drawLine(t,color,label){
+            if(t==null) return;
+            const x=scales.x.getPixelForValue(t);
+            ctx.save();
+            ctx.strokeStyle=color;
+            ctx.lineWidth=2;
+            ctx.beginPath();
+            ctx.moveTo(x,chartArea.top);
+            ctx.lineTo(x,chartArea.bottom);
+            ctx.stroke();
+
+            ctx.fillStyle=color;
+            ctx.font="12px sans-serif";
+            ctx.fillText(label, x+4, chartArea.top+12);
+            ctx.restore();
+          }
+
+          drawLine(dryEnd,"#f9a825","Dry End");
+          drawLine(fc,"#e65100","1st Crack");
+        }
+      }
+    ]
+    /* ★ ここまで */
   }
 );
-
 /* =====================
    描画
 ===================== */
