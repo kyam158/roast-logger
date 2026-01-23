@@ -114,6 +114,20 @@ const chart=new Chart(
     /* ★ ここまで */
   }
 );
+  /* =====================
+   描画
+===================== */
+function draw(){
+  if(!startTime) return;
+
+  const t = nowSec();
+  time.textContent = fmt(t);
+
+  chart.options.scales.x.max = Math.max(600, t + 10);
+  chart.data.datasets[0].data = tempData;
+  chart.data.datasets[1].data = gasData;
+  chart.update();
+}
 /* =====================
    操作
 ===================== */
