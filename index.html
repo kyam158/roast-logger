@@ -56,6 +56,19 @@ button,input{width:100%;padding:12px;margin:6px 0;font-size:16px}
 </div>
 
 <script>
+  <script>
+/* ===== DOM取得（Safari必須）===== */
+const time = document.getElementById("time");
+const startBtn = document.getElementById("startBtn");
+const tempInput = document.getElementById("tempInput");
+const tempSet = document.getElementById("tempSet");
+const gasInput = document.getElementById("gasInput");
+const gasLabel = document.getElementById("gasLabel");
+const dryBtn = document.getElementById("dryBtn");
+const fcBtn = document.getElementById("fcBtn");
+const dropBtn = document.getElementById("dropBtn");
+const imgBtn = document.getElementById("imgBtn");
+const csvBtn = document.getElementById("csvBtn");
 let startTime=null,endTime=null,timer=null;
 let temp=150,gas=2.5;
 let dryEnd=null,fc=null;
