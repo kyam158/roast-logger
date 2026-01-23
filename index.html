@@ -1,3 +1,5 @@
+確認お願いいたします
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -78,9 +80,9 @@ const chart=new Chart(document.getElementById("chart"),{
   type:"linear",
   min:0,
   ticks:{
-  stepSize:60,
-  callback:value => `${value/60}分`
-}
+    stepSize:60,              // ← 1分刻み（超重要）
+    callback:value => value / 60
+  }
 },
       y:{min:0,max:260},
       yR:{position:"right",min:0,max:5,grid:{drawOnChartArea:false}}
@@ -239,55 +241,38 @@ function getPhaseByTime(t){
   if(dryEnd != null && t >= dryEnd) return "MAILLARD";
   return "DRYING";
 }
-
-csvBtn.onclick = () => {
+  csvBtn.onclick=()=>{
   if(!tempData.length) return alert("データなし");
-
   const devTime =
-    (fc!=null && endTime!=null) ? (endTime - fc) : null;
+  (fc!=null && endTime!=null) ? (endTime - fc) : null;
 
-  const devRate =
-    (devTime!=null && endTime>0)
-      ? (devTime / endTime * 100).toFixed(1)
-      : null;
-
-  let csv = [
-    "# Roast Logger CSV",
-    `# DryEnd,${dryEnd ?? ""}`,
-    `# FirstCrack,${fc ?? ""}`,
-    `# Drop,${endTime ?? ""}`,
-    `# DevelopmentTime,${devTime ?? ""}`,
-    `# DevelopmentRate,${devRate ?? ""}`,
-    "time,temperature,gas,phase"
-  ];
-
-  /* ★ ① まず map を作る */
-  const map = {};
-  tempData.forEach(d=>{
-    map[d.x] = map[d.x] || {};
-    map[d.x].t = d.y;
-  });
-  gasData.forEach(d=>{
-    map[d.x] = map[d.x] || {};
-    map[d.x].g = d.y;
-  });
-
-  /* ★ ② map を使って CSV 行を作る */
+const devRate =
+  (devTime!=null && endTime>0)
+    ? (devTime / endTime * 100).toFixed(1)
+    : null;
+   let csv=[
+  "# Roast Logger CSV",
+  `# DryEnd,${dryEnd??""}`,
+  `# FirstCrack,${fc??""}`,
+  `# Drop,${endTime??""}`,
+  `# DevelopmentTime,${devTime??""}`,
+  `# DevelopmentRate,${devRate??""}`,
+  "time,temperature,gas,phase"
+];
+  const map={};
+  tempData.forEach(d=>{map[d.x]=map[d.x]||{};map[d.x].t=d.y});
+  gasData.forEach(d=>{map[d.x]=map[d.x]||{};map[d.x].g=d.y});
   Object.keys(map).sort((a,b)=>a-b).forEach(t=>{
-    const phase = getPhaseByTime(Number(t));
-    csv.push([
-      secToMinSec(Number(t)),
-      map[t].t ?? "",
-      map[t].g ?? "",
-      phase
-    ].join(","));
-  });
+  const phase = getPhaseByTime(Number(t));
 
-  /* ★ ③ 最後に保存 */
-  const blob = new Blob([csv.join("\n")], { type: "text/csv" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `roast_${Date.now()}.csv`;
+csv.push(
+  `${secToMinSec(Number(t))},${map[t].t ?? ""},${map[t].g ?? ""},${phase}`
+);
+  });
+  const blob=new Blob([csv.join("\n")],{type:"text/csv"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=`roast_${Date.now()}.csv`;
   a.click();
 };
 </script>
