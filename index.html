@@ -70,7 +70,13 @@ const chart=new Chart(
   {
     type:"line",
     data:{datasets:[
-      {label:"Temp",data:[],borderWidth:2},
+      {
+  label:"Temp",
+  data:[],
+  borderWidth:2,
+  tension:0.3,
+  cubicInterpolationMode:"monotone"
+},
       {label:"Gas",data:[],yAxisID:"yR",borderDash:[4,4]}
     ]},
     options:{
