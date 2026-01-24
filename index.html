@@ -48,6 +48,8 @@ button {
   <button id="gasUp">＋</button>
 </div>
 
+<button id="chargeBtn">Charge</button>
+<button id="tpBtn">Turning Point</button>
   <button id="dryBtn">Dry End（長押し）</button>
   <button id="fcBtn">1ハゼ（長押し）</button>
   <button id="dropBtn">DROP</button>
@@ -72,6 +74,7 @@ let startTime=null,endTime=null,timer=null;
 let startTemp = 150;
 let temp=150,gas=2.5;
 let dryEnd=null,fc=null;
+let charge=null,tp=null;   // ← これを追加
 const tempData=[],gasData=[];
 
 const nowSec=()=> endTime ?? Math.floor((Date.now()-startTime)/1000);
@@ -142,8 +145,10 @@ const chart=new Chart(
             ctx.restore();
           }
 
-          drawLine(dryEnd,"#f9a825","Dry End");
-          drawLine(fc,"#e65100","1st Crack");
+drawLine(charge,"#1565c0","Charge");
+drawLine(tp,"#2e7d32","TP");
+drawLine(dryEnd,"#f9a825","Dry End");
+drawLine(fc,"#e65100","1st Crack");
         }
       },
        // ★★★ ここに追加 ★★★
@@ -250,6 +255,17 @@ fcBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>fc=nowSec());};
 [dryBtn,fcBtn].forEach(b=>{
   b.onpointerup=holdCancel;
   b.onpointercancel=holdCancel;
+  chargeBtn.onclick = () => {
+  if(!startTime) return;
+  charge = nowSec();
+  draw();
+};
+
+tpBtn.onclick = () => {
+  if(!startTime) return;
+  tp = nowSec();
+  draw();
+};
 });
 
 /* =====================
@@ -280,6 +296,8 @@ csvBtn.onclick=()=>{
 
   let csv=[
     "# Roast Logger CSV",
+    "# Charge," + (charge ?? ""),
+"# TurningPoint," + (tp ?? ""),
     `# DryEnd,${dryEnd ?? ""}`,
     `# FirstCrack,${fc ?? ""}`,
     `# Drop,${endTime ?? ""}`,
