@@ -76,7 +76,17 @@ const chart=new Chart(
     options:{
       animation:false,
       scales:{
-        x:{type:"linear",min:0},
+        x:{
+  type:"linear",
+  min:0,
+  ticks:{
+    stepSize:60,
+    callback:(value)=>{
+      const m = Math.floor(value / 60);
+      return `${m}:00`;
+    }
+  }
+},
         y:{
   min:0,
   max:260,
