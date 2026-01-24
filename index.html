@@ -74,19 +74,14 @@ const chart=new Chart(
       {label:"Gas",data:[],yAxisID:"yR",borderDash:[4,4]}
     ]},
     options:{
-  animation:false,
-  scales:{
-    x:{type:"linear",min:0},
-    y:{
-      min:0,
-      max:260,
-      ticks:{
-        stepSize:20
+      animation:false,
+      scales:{
+        x:{type:"linear",min:0},
+        y:{min:0,max:260},
+        yR:{position:"right",min:0,max:5,grid:{drawOnChartArea:false}}
       }
     },
-    yR:{position:"right",min:0,max:5,grid:{drawOnChartArea:false}}
-  }
-}
+
     /* ★ ここから追加 */
     plugins:[
       {
@@ -266,3 +261,4 @@ csvBtn.onclick=()=>{
 </script>
 </body>
 </html>
+
