@@ -77,7 +77,13 @@ const chart=new Chart(
       animation:false,
       scales:{
         x:{type:"linear",min:0},
-        y:{min:0,max:260},
+        y:{
+  min:0,
+  max:260,
+  ticks:{
+    stepSize:20
+  }
+},
         yR:{position:"right",min:0,max:5,grid:{drawOnChartArea:false}}
       }
     },
