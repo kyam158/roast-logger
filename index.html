@@ -217,8 +217,15 @@ const setGas = v => {
   draw();
 };
 
-gasUp.onclick = () => setGas(gas + 0.1);
-gasDown.onclick = () => setGas(gas - 0.1);
+gasUp.onpointerdown = e => {
+  e.preventDefault();
+  setGas(gas + 0.1);
+};
+
+gasDown.onpointerdown = e => {
+  e.preventDefault();
+  setGas(gas - 0.1);
+};
 
 /* =====================
    長押し
