@@ -27,6 +27,10 @@ button {
   <div id="chartWrap"><canvas id="chart"></canvas></div>
   <div id="time">0:00</div>
 
+<label>開始温度 (℃)</label>
+<div class="row">
+  <input id="startTempInput" type="number" value="150">
+</div>
   <button id="startBtn">焙煎開始</button>
 
   <label>豆温 (℃)</label>
@@ -65,6 +69,7 @@ const secToMinSec = s =>
    状態
 ===================== */
 let startTime=null,endTime=null,timer=null;
+let startTemp = 150;
 let temp=150,gas=2.5;
 let dryEnd=null,fc=null;
 const tempData=[],gasData=[];
@@ -192,13 +197,19 @@ function draw(){
    操作
 ===================== */
 startBtn.onclick=()=>{
+  startTemp = parseInt(startTempInput.value) || startTemp;
+  temp = startTemp; // ← 現在温度も同期
+
   startTime=Date.now();
   endTime=null;
   dryEnd=fc=null;
+
   tempData.length=0;
   gasData.length=0;
-  tempData.push({x:0,y:temp});
+
+  tempData.push({x:0,y:startTemp});
   gasData.push({x:0,y:gas});
+
   clearInterval(timer);
   timer=setInterval(draw,1000);
   draw();
