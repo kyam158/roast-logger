@@ -216,11 +216,23 @@ dropBtn.onclick=()=>{
 csvBtn.onclick=()=>{
   if(!tempData.length) return alert("データなし");
 
+  const devTime =
+    (fc != null && endTime != null)
+      ? (endTime - fc)
+      : null;
+
+  const devRate =
+    (devTime != null && endTime > 0)
+      ? (devTime / endTime * 100).toFixed(1)
+      : null;
+
   let csv=[
     "# Roast Logger CSV",
     `# DryEnd,${dryEnd ?? ""}`,
     `# FirstCrack,${fc ?? ""}`,
     `# Drop,${endTime ?? ""}`,
+    `# DevelopmentTime,${devTime ?? ""}`,
+    `# DevelopmentRate,${devRate ?? ""}`,
     "time(mm:ss),temperature(C),gas"
   ];
 
