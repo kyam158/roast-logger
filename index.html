@@ -331,15 +331,29 @@ csvBtn.onclick=()=>{
 "# DryEndTemp," + (dryEndTemp ?? ""),
 "# FirstCrackTemp," + (fcTemp ?? ""),
 "# DropTemp," + (dropTemp ?? ""),
-    "# Charge," + (charge ?? ""),
-"# TurningPoint," + (tp ?? ""),
-    `# DryEnd,${dryEnd ?? ""}`,
-    `# FirstCrack,${fc ?? ""}`,
-    `# Drop,${endTime ?? ""}`,
-    `# DevelopmentTime,${devTime ?? ""}`,
-    `# DevelopmentRate,${devRate ?? ""}`,
-    "time(mm:ss),temperature(C),gas"
-  ];
+  "# Charge," +
+    (charge != null ? secToMinSec(charge) : ""),
+
+  "# TurningPoint," +
+    (tp != null ? secToMinSec(tp) : ""),
+
+  "# DryEnd," +
+    (dryEnd != null ? secToMinSec(dryEnd) : ""),
+
+  "# FirstCrack," +
+    (fc != null ? secToMinSec(fc) : ""),
+
+  "# Drop," +
+    (endTime != null ? secToMinSec(endTime) : ""),
+
+  "# DevelopmentTime," +
+    (devTime != null ? secToMinSec(devTime) : ""),
+
+  "# DevelopmentRate," +
+    (devRate ?? ""),
+
+  "time(mm:ss),temperature(C),gas"
+];
 
   const map={};
   tempData.forEach(d=>{
