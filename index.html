@@ -132,27 +132,40 @@ const chart=new Chart(
         afterDraw(chart){
           const {ctx,scales,chartArea}=chart;
 
-          function drawLine(t,color,label){
-            if(t==null) return;
-            const x=scales.x.getPixelForValue(t);
-            ctx.save();
-            ctx.strokeStyle=color;
-            ctx.lineWidth=2;
-            ctx.beginPath();
-            ctx.moveTo(x,chartArea.top);
-            ctx.lineTo(x,chartArea.bottom);
-            ctx.stroke();
+          function drawLine(t, tempValue, color, label){
+  if(t==null) return;
 
-            ctx.fillStyle=color;
-            ctx.font="12px sans-serif";
-            ctx.fillText(label, x+4, chartArea.top+12);
-            ctx.restore();
-          }
+  const x = scales.x.getPixelForValue(t);
 
-drawLine(charge,"#1565c0","Charge");
-drawLine(tp,"#2e7d32","TP");
-drawLine(dryEnd,"#f9a825","Dry End");
-drawLine(fc,"#e65100","1st Crack");
+  ctx.save();
+
+  // 縦線
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x, chartArea.top);
+  ctx.lineTo(x, chartArea.bottom);
+  ctx.stroke();
+
+  // ラベル（文字）
+  ctx.fillStyle = color;
+  ctx.font = "12px sans-serif";
+
+  const tempText =
+    tempValue != null ? ` ${tempValue}℃` : "";
+
+  ctx.fillText(
+    label + tempText,
+    x + 4,
+    chartArea.top + 12
+  );
+
+  ctx.restore();
+}
+drawLine(charge, startTemp, "#1565c0", "Charge");
+drawLine(tp, tpTemp, "#2e7d32", "TP");
+drawLine(dryEnd, dryEndTemp, "#f9a825", "Dry End");
+drawLine(fc, fcTemp, "#e65100", "1st Crack");
         }
       },
        // ★★★ ここに追加 ★★★
