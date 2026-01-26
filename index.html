@@ -147,8 +147,8 @@ const chart=new Chart(
 
 drawLine(charge,"#1565c0","Charge");
 drawLine(tp,"#2e7d32","TP");
-drawLine(dryEnd,"#f9a825","Dry End");
-drawLine(fc,"#e65100","1st Crack");
+drawLine(dryEnd?.time,"#f9a825","Dry End");
+drawLine(fc?.time,"#e65100","1st Crack");
         }
       },
        // ★★★ ここに追加 ★★★
@@ -250,8 +250,25 @@ let hold=null;
 const holdStart=f=>hold=setTimeout(f,600);
 const holdCancel=()=>clearTimeout(hold);
 
-dryBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>dryEnd=nowSec());};
-fcBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>fc=nowSec());};
+dryBtn.onpointerdown = e => {
+  e.preventDefault();
+  holdStart(()=>{
+    dryEnd = {
+      time: nowSec(),
+      temp: getCurrentTemp()
+    };
+  });
+};
+
+fcBtn.onpointerdown = e => {
+  e.preventDefault();
+  holdStart(()=>{
+    fc = {
+      time: nowSec(),
+      temp: getCurrentTemp()
+    };
+  });
+};
 [dryBtn,fcBtn].forEach(b=>{
   b.onpointerup=holdCancel;
   b.onpointercancel=holdCancel;
@@ -285,24 +302,25 @@ csvBtn.onclick=()=>{
   if(!tempData.length) return alert("データなし");
 
   const devTime =
-    (fc != null && endTime != null)
-      ? (endTime - fc)
-      : null;
+  (fc?.time != null && endTime != null)
+    ? endTime - fc.time
+    : null;
 
-  const devRate =
-    (devTime != null && endTime > 0)
-      ? (devTime / endTime * 100).toFixed(1)
-      : null;
-
+const devRate =
+  (devTime != null && endTime > 0)
+    ? (devTime / endTime * 100).toFixed(1)
+    : null;
   let csv=[
     "# Roast Logger CSV",
     "# Charge," + (charge ?? ""),
 "# TurningPoint," + (tp ?? ""),
-    `# DryEnd,${dryEnd ?? ""}`,
-    `# FirstCrack,${fc ?? ""}`,
-    `# Drop,${endTime ?? ""}`,
-    `# DevelopmentTime,${devTime ?? ""}`,
-    `# DevelopmentRate,${devRate ?? ""}`,
+    "# DryEnd," + (dryEnd?.time ?? ""),
+"# DryEndTemp," + (dryEnd?.temp ?? ""),
+"# FirstCrack," + (fc?.time ?? ""),
+"# FirstCrackTemp," + (fc?.temp ?? ""),
+"# Drop," + (endTime ?? ""),
+    "# DevelopmentTime," + (devTime ?? ""),
+"# DevelopmentRate," + (devRate ?? ""),
     "time(mm:ss),temperature(C),gas"
   ];
 
