@@ -253,9 +253,10 @@ const holdCancel=()=>clearTimeout(hold);
 dryBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>dryEnd=nowSec());};
 fcBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>fc=nowSec());};
 [dryBtn,fcBtn].forEach(b=>{
-  b.onpointerup=holdCancel;
-  b.onpointercancel=holdCancel;
-  chargeBtn.onclick = () => {
+  b.onpointerup = holdCancel;
+  b.onpointercancel = holdCancel;
+});
+chargeBtn.onclick = () => {
   if(!startTime) return;
   charge = nowSec();
   draw();
@@ -266,8 +267,6 @@ tpBtn.onclick = () => {
   tp = nowSec();
   draw();
 };
-});
-
 /* =====================
    DROP
 ===================== */
