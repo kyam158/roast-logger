@@ -74,7 +74,11 @@ let startTime=null,endTime=null,timer=null;
 let startTemp = 150;
 let temp=150,gas=2.5;
 let dryEnd=null,fc=null;
-let charge=null,tp=null;   // ← これを追加
+let charge=null,tp=null;
+let tpTemp=null;
+let dryEndTemp=null;
+let fcTemp=null;
+let dropTemp=null;
 const tempData=[],gasData=[];
 
 const nowSec=()=> endTime ?? Math.floor((Date.now()-startTime)/1000);
@@ -250,8 +254,20 @@ let hold=null;
 const holdStart=f=>hold=setTimeout(f,600);
 const holdCancel=()=>clearTimeout(hold);
 
-dryBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>dryEnd=nowSec());};
-fcBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>fc=nowSec());};
+dryBtn.onpointerdown = e => {
+  e.preventDefault();
+  holdStart(()=>{
+    dryEnd = nowSec();
+    dryEndTemp = temp;   // ★ 温度
+  });
+};
+fcBtn.onpointerdown = e => {
+  e.preventDefault();
+  holdStart(()=>{
+    fc = nowSec();
+    fcTemp = temp;   // ★ 温度
+  });
+};
 [dryBtn,fcBtn].forEach(b=>{
   b.onpointerup = holdCancel;
   b.onpointercancel = holdCancel;
@@ -265,14 +281,16 @@ chargeBtn.onclick = () => {
 tpBtn.onclick = () => {
   if(!startTime) return;
   tp = nowSec();
+  tpTemp = temp;   // ★ 温度を保存
   draw();
 };
 /* =====================
    DROP
 ===================== */
-dropBtn.onclick=()=>{
-  if(!startTime||endTime) return;
-  endTime=nowSec();
+dropBtn.onclick = () => {
+  if(!startTime || endTime) return;
+  endTime = nowSec();
+  dropTemp = temp;   // ★ 温度
   clearInterval(timer);
   draw();
 };
@@ -295,6 +313,11 @@ csvBtn.onclick=()=>{
 
   let csv=[
     "# Roast Logger CSV",
+    "# ChargeTemp," + (charge!=null ? startTemp : ""),
+"# TurningPointTemp," + (tpTemp ?? ""),
+"# DryEndTemp," + (dryEndTemp ?? ""),
+"# FirstCrackTemp," + (fcTemp ?? ""),
+"# DropTemp," + (dropTemp ?? ""),
     "# Charge," + (charge ?? ""),
 "# TurningPoint," + (tp ?? ""),
     `# DryEnd,${dryEnd ?? ""}`,
