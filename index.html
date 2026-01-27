@@ -323,6 +323,16 @@ dropBtn.onclick = () => {
 csvBtn.onclick=()=>{
   if(!tempData.length) return alert("データなし");
 
+const dryPhaseTime =
+  (dryEnd != null)
+    ? dryEnd
+    : null;
+
+const maillardTime =
+  (dryEnd != null && fc != null)
+    ? (fc - dryEnd)
+    : null;
+    
   const devTime =
     (fc != null && endTime != null)
       ? (endTime - fc)
@@ -349,6 +359,12 @@ csvBtn.onclick=()=>{
   "# DryEnd," +
     (dryEnd != null ? secToMinSec(dryEnd) : ""),
 
+"# StartToDry," +
+  (dryPhaseTime != null ? secToMinSec(dryPhaseTime) : ""),
+
+"# DryToFC," +
+  (maillardTime != null ? secToMinSec(maillardTime) : ""),
+  
   "# FirstCrack," +
     (fc != null ? secToMinSec(fc) : ""),
 
