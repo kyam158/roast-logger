@@ -333,6 +333,18 @@ const maillardTime =
     ? (fc - dryEnd)
     : null;
     
+    const totalTime = endTime ?? null;
+
+const dryPhaseRate =
+  (dryPhaseTime != null && totalTime)
+    ? (dryPhaseTime / totalTime * 100).toFixed(1)
+    : null;
+
+const maillardRate =
+  (maillardTime != null && totalTime)
+    ? (maillardTime / totalTime * 100).toFixed(1)
+    : null;
+    
   const devTime =
     (fc != null && endTime != null)
       ? (endTime - fc)
@@ -374,6 +386,12 @@ const maillardTime =
   "# DevelopmentTime," +
     (devTime != null ? secToMinSec(devTime) : ""),
 
+"# StartToDryRate," +
+  (dryPhaseRate != null ? dryPhaseRate + "%" : ""),
+
+"# DryToFCRate," +
+  (maillardRate != null ? maillardRate + "%" : ""),
+  
   "# DevelopmentRate," +
     (devRate ?? ""),
 
