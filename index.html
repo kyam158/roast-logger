@@ -26,6 +26,16 @@ button {
 <div id="wrap">
   <div id="chartWrap"><canvas id="chart"></canvas></div>
   <div id="time">0:00</div>
+  
+  <label>豆情報</label>
+
+<input id="roastDate" type="date">
+
+<input id="country" placeholder="国名（例：Ethiopia）">
+<input id="farm" placeholder="農園名">
+<input id="variety" placeholder="品種">
+<input id="process" placeholder="精製方法（Washed / Natural など）">
+<input id="altitude" placeholder="標高（m）">
 
 <label>開始温度 (℃)</label>
 <div class="row">
@@ -74,6 +84,12 @@ const secToMinSec = s =>
 /* =====================
    状態
 ===================== */
+let roastDate = "";
+let country = "";
+let farm = "";
+let variety = "";
+let process = "";
+let altitude = "";
 let startTime=null,endTime=null,timer=null;
 let startTemp = 150;
 let temp=150,gas=2.5;
@@ -223,6 +239,12 @@ function draw(){
    操作
 ===================== */
 startBtn.onclick=()=>{
+  roastDate = roastDateInput?.value || "";
+country = countryInput.value || "";
+farm = farmInput.value || "";
+variety = varietyInput.value || "";
+process = processInput.value || "";
+altitude = altitudeInput.value || "";
   startTemp = parseInt(startTempInput.value) || startTemp;
   temp = startTemp; // ← 現在温度も同期
 
@@ -357,6 +379,13 @@ const maillardRate =
 
   let csv=[
     "# Roast Logger CSV",
+  "# Roast Logger CSV",
+  "# Date," + roastDate,
+  "# Country," + country,
+  "# Farm," + farm,
+  "# Variety," + variety,
+  "# Process," + process,
+  "# Altitude," + altitude,
     "# ChargeTemp," + (charge!=null ? startTemp : ""),
 "# TurningPointTemp," + (tpTemp ?? ""),
 "# DryEndTemp," + (dryEndTemp ?? ""),
