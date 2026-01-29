@@ -239,14 +239,15 @@ function draw(){
    操作
 ===================== */
 startBtn.onclick=()=>{
-  roastDate = roastDateInput?.value || "";
-country = countryInput.value || "";
-farm = farmInput.value || "";
-variety = varietyInput.value || "";
-process = processInput.value || "";
-altitude = altitudeInput.value || "";
+  roastDate = document.getElementById("roastDate").value || "";
+  country   = document.getElementById("country").value || "";
+  farm      = document.getElementById("farm").value || "";
+  variety   = document.getElementById("variety").value || "";
+  process   = document.getElementById("process").value || "";
+  altitude  = document.getElementById("altitude").value || "";
+
   startTemp = parseInt(startTempInput.value) || startTemp;
-  temp = startTemp; // ← 現在温度も同期
+  temp = startTemp;
 
   startTime=Date.now();
   endTime=null;
