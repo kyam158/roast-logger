@@ -346,6 +346,14 @@ dropBtn.onclick = () => {
 csvBtn.onclick=()=>{
   if(!tempData.length) return alert("データなし");
 
+  // ★ ここを追加（最新の入力値を取り直す）
+  roastDate = document.getElementById("roastDate").value || "";
+  country   = document.getElementById("country").value || "";
+  farm      = document.getElementById("farm").value || "";
+  variety   = document.getElementById("variety").value || "";
+  process   = document.getElementById("process").value || "";
+  altitude  = document.getElementById("altitude").value || "";
+
 const dryPhaseTime =
   (dryEnd != null)
     ? dryEnd
