@@ -379,7 +379,6 @@ const maillardRate =
 
   let csv=[
     "# Roast Logger CSV",
-  "# Roast Logger CSV",
   "# Date," + roastDate,
   "# Country," + country,
   "# Farm," + farm,
@@ -422,8 +421,8 @@ const maillardRate =
   (maillardRate != null ? maillardRate + "%" : ""),
   
   "# DevelopmentRate," +
-    (devRate ?? ""),
-
+  (devRate != null ? devRate + "%" : ""),
+  
   "time(mm:ss),temperature(C),gas"
 ];
 
