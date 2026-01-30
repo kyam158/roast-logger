@@ -452,10 +452,16 @@ const maillardRate =
   });
 
   const blob=new Blob([csv.join("\n")],{type:"text/csv"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download=`roast_${Date.now()}.csv`;
-  a.click();
+const a=document.createElement("a");
+a.href=URL.createObjectURL(blob);
+
+const datePart = roastDate || "no_date";
+const countryPart = country || "no_country";
+const farmPart = farm || "no_farm";
+const safe = s => s.replace(/[\\/:*?"<>| ]+/g, "_");
+
+a.download = `${safe(datePart)}_${safe(countryPart)}_${safe(farmPart)}.csv`;
+a.click();
 };
 </script>
 </body>
