@@ -511,6 +511,8 @@ document.getElementById("loadCsv").onchange = e => {
 chart.options.scales.x.max = endTime + 10;
 chart.options.scales.x.min = 0;
 
+time.textContent = secToMinSec(endTime);
+
     draw();
   };
   reader.readAsText(file);
