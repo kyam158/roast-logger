@@ -69,6 +69,8 @@ button {
   <button id="dropBtn">DROP</button>
 
   <button id="csvBtn">CSV書き出し</button>
+<input id="loadCsv" type="file" accept=".csv">
+    
 </div>
 
 <script>
@@ -245,6 +247,16 @@ startBtn.onclick=()=>{
   variety   = document.getElementById("variety").value || "";
   process   = document.getElementById("process").value || "";
   altitude  = document.getElementById("altitude").value || "";
+
+charge = null;
+tp = null;
+dryEnd = null;
+fc = null;
+
+tpTemp = null;
+dryEndTemp = null;
+fcTemp = null;
+dropTemp = null;
 
   startTemp = parseInt(startTempInput.value) || startTemp;
   temp = startTemp;
@@ -462,6 +474,43 @@ const safe = s => s.replace(/[\\/:*?"<>| ]+/g, "_");
 
 a.download = `${safe(datePart)}_${safe(countryPart)}_${safe(farmPart)}.csv`;
 a.click();
+};
+
+document.getElementById("loadCsv").onchange = e => {
+  const file = e.target.files[0];
+  if(!file) return;
+
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const lines = ev.target.result.split("\n");
+
+    tempData.length = 0;
+    gasData.length = 0;
+
+    lines.forEach(line => {
+      if(line.startsWith("#") || line.startsWith("time")) return;
+
+      const [t, tempStr, gasStr] = line.split(",");
+      if(!t) return;
+
+      const [m,s] = t.split(":").map(Number);
+      const sec = m*60 + s;
+
+      if(tempStr)
+        tempData.push({x:sec, y:Number(tempStr)});
+      if(gasStr)
+        gasData.push({x:sec, y:Number(gasStr)});
+    });
+
+    startTime = Date.now();
+    endTime = Math.max(
+      ...tempData.map(d=>d.x),
+      ...gasData.map(d=>d.x)
+    );
+
+    draw();
+  };
+  reader.readAsText(file);
 };
 </script>
 </body>
