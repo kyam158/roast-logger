@@ -493,9 +493,44 @@ document.getElementById("loadCsv").onchange = e => {
     tempData.length = 0;
     gasData.length = 0;
 
-    lines.forEach(line => {
-      if(line.startsWith("#") || line.startsWith("time")) return;
+    
+      lines.forEach(line => {
 
+  // ===== フェーズ情報 =====
+  if(line.startsWith("# Charge,")){
+    charge = minSecToSec(line.split(",")[1]);
+    return;
+  }
+  if(line.startsWith("# TurningPoint,")){
+    tp = minSecToSec(line.split(",")[1]);
+    return;
+  }
+  if(line.startsWith("# DryEnd,")){
+    dryEnd = minSecToSec(line.split(",")[1]);
+    return;
+  }
+  if(line.startsWith("# FirstCrack,")){
+    fc = minSecToSec(line.split(",")[1]);
+    return;
+  }
+  if(line.startsWith("# Drop,")){
+    endTime = minSecToSec(line.split(",")[1]);
+    return;
+  }
+
+  // ===== データ行 =====
+  if(line.startsWith("#") || line.startsWith("time")) return;
+
+  const [t, tempStr, gasStr] = line.split(",");
+  if(!t) return;
+
+  const sec = minSecToSec(t);
+
+  if(tempStr)
+    tempData.push({x:sec, y:Number(tempStr)});
+  if(gasStr)
+    gasData.push({x:sec, y:Number(gasStr)});
+});
       const [t, tempStr, gasStr] = line.split(",");
       if(!t) return;
 
@@ -508,18 +543,21 @@ document.getElementById("loadCsv").onchange = e => {
         gasData.push({x:sec, y:Number(gasStr)});
     });
 
-    startTime = Date.now();
-    endTime = Math.max(
-      ...tempData.map(d=>d.x),
-      ...gasData.map(d=>d.x)
-    );
-    
+  startTime = Date.now();
+
+if(!endTime){
+  endTime = Math.max(
+    ...tempData.map(d=>d.x),
+    ...gasData.map(d=>d.x)
+  );
+}
+
+// スケール調整
 chart.options.scales.x.max = endTime + 10;
 chart.options.scales.x.min = 0;
 
 time.textContent = secToMinSec(endTime);
-
-    draw();
+draw();
   };
   reader.readAsText(file);
 };
