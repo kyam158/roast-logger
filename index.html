@@ -70,6 +70,10 @@ button {
 
   <button id="csvBtn">CSV書き出し</button>
 <input id="loadCsv" type="file" accept=".csv">
+  
+  <select id="historySelect">
+  <option value="">焙煎履歴を選択</option>
+</select>
     
 </div>
 
@@ -110,7 +114,7 @@ let dropTemp=null;
 const tempData=[],gasData=[];
 
 const nowSec=()=> endTime ?? Math.floor((Date.now()-startTime)/1000);
-
+const roastHistory = [];
 /* =====================
    Chart
 ===================== */
@@ -572,10 +576,71 @@ chart.options.scales.x.max = endTime + 10;
 chart.options.scales.x.min = 0;
 
 time.textContent = secToMinSec(endTime);
+
+// ===== 履歴に保存 =====
+const title =
+  (roastDate || "no_date") + "_" +
+  (country || "no_country") + "_" +
+  (farm || "no_farm");
+
+roastHistory.push({
+  title,
+  tempData: JSON.parse(JSON.stringify(tempData)),
+  gasData: JSON.parse(JSON.stringify(gasData)),
+  charge,
+  tp,
+  dryEnd,
+  fc,
+  endTime,
+  tpTemp,
+  dryEndTemp,
+  fcTemp,
+  dropTemp
+});
+
+// セレクタ更新
+const sel = document.getElementById("historySelect");
+const opt = document.createElement("option");
+opt.value = roastHistory.length - 1;
+opt.textContent = title;
+sel.appendChild(opt);
+
 draw();
   };
   reader.readAsText(file);
 };
+
+historySelect.onchange = e => {
+  const idx = e.target.value;
+  if(idx === "") return;
+
+  const h = roastHistory[idx];
+
+  tempData.length = 0;
+  gasData.length = 0;
+
+  h.tempData.forEach(d => tempData.push(d));
+  h.gasData.forEach(d => gasData.push(d));
+
+  charge = h.charge;
+  tp = h.tp;
+  dryEnd = h.dryEnd;
+  fc = h.fc;
+  endTime = h.endTime;
+
+  tpTemp = h.tpTemp;
+  dryEndTemp = h.dryEndTemp;
+  fcTemp = h.fcTemp;
+  dropTemp = h.dropTemp;
+
+  startTime = Date.now();
+
+  chart.options.scales.x.max = endTime + 10;
+  time.textContent = secToMinSec(endTime);
+
+  draw();
+};
+
 </script>
 </body>
 </html>
