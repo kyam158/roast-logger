@@ -531,17 +531,7 @@ document.getElementById("loadCsv").onchange = e => {
   if(gasStr)
     gasData.push({x:sec, y:Number(gasStr)});
 });
-      const [t, tempStr, gasStr] = line.split(",");
-      if(!t) return;
-
-      const [m,s] = t.split(":").map(Number);
-      const sec = m*60 + s;
-
-      if(tempStr)
-        tempData.push({x:sec, y:Number(tempStr)});
-      if(gasStr)
-        gasData.push({x:sec, y:Number(gasStr)});
-    });
+    
 
   startTime = Date.now();
 
