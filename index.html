@@ -75,6 +75,10 @@ button {
   <option value="">焙煎履歴を選択</option>
 </select>
     
+    <select id="compareSelect">
+  <option value="">比較焙煎を選択</option>
+</select>
+
 </div>
 
 <script>
@@ -111,6 +115,8 @@ let tpTemp=null;
 let dryEndTemp=null;
 let fcTemp=null;
 let dropTemp=null;
+let compareTempData = [];
+let compareLabel = "";
 const tempData=[],gasData=[];
 
 const nowSec=()=> endTime ?? Math.floor((Date.now()-startTime)/1000);
@@ -130,6 +136,18 @@ const chart=new Chart(
   tension:0.3,
   cubicInterpolationMode:"monotone"
 },
+
+{
+  label:"Compare Temp",
+  data:[],
+  borderWidth:2,
+  tension:0.3,
+  cubicInterpolationMode:"monotone",
+  borderColor:"rgba(0,0,0,0.3)",
+  borderDash:[6,4],
+  pointRadius:0
+},
+
       {label:"Gas",data:[],yAxisID:"yR",borderDash:[4,4]}
     ]},
     options:{
@@ -244,7 +262,7 @@ function draw(){
 
   chart.options.scales.x.max = Math.max(600, t + 10);
   chart.data.datasets[0].data = tempData;
-  chart.data.datasets[1].data = gasData;
+  chart.data.datasets[2].data = gasData;
   chart.update();
 }
 /* =====================
@@ -599,6 +617,12 @@ roastHistory.push({
 });
 
 // セレクタ更新
+const cmpSel = document.getElementById("compareSelect");
+const cmpOpt = document.createElement("option");
+cmpOpt.value = roastHistory.length - 1;
+cmpOpt.textContent = title;
+cmpSel.appendChild(cmpOpt);
+
 const sel = document.getElementById("historySelect");
 const opt = document.createElement("option");
 opt.value = roastHistory.length - 1;
@@ -615,6 +639,7 @@ historySelect.onchange = e => {
   if(idx === "") return;
 
   const h = roastHistory[idx];
+
 
   tempData.length = 0;
   gasData.length = 0;
@@ -640,7 +665,26 @@ historySelect.onchange = e => {
 
   draw();
 };
+compareSelect.onchange = e => {
+  const idx = e.target.value;
 
+  if(idx === ""){
+    compareTempData = [];
+    chart.data.datasets[1].data = [];
+    chart.update();
+    return;
+  }
+
+  const h = roastHistory[idx];
+
+  compareTempData = h.tempData.map(d => ({
+    x: d.x,
+    y: d.y
+  }));
+
+  chart.data.datasets[1].data = compareTempData;
+  chart.update();
+};
 </script>
 </body>
 </html>
