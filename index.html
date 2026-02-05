@@ -151,14 +151,33 @@ const chart=new Chart(
   {
     type:"line",
     data:{datasets:[
+      
       {
-  label:"Temp",
-  data:[],
-  borderWidth:2,
-  tension:0.3,
-  cubicInterpolationMode:"monotone"
-},
+  label: "Temp",
+  data: [],
+  borderWidth: 2,
+  tension: 0.3,
+  cubicInterpolationMode: "monotone",
+  pointRadius: 0,
 
+  segment: {
+    borderColor: ctx => {
+      // p1 が無い時（最初の1点など）
+      if (!ctx.p1) return "#e53935";
+
+      const t = ctx.p1.parsed.x;
+
+      // 焙煎中なら色付き
+      if (startTime && !endTime) {
+        return "#e53935"; // 🔥 焙煎中の色
+      }
+
+      // 履歴・比較表示はグレー
+      return "#999";
+    }
+  }
+}
+    
 {
   label:"Compare Temp",
   data:[],
