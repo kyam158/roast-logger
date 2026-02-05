@@ -595,6 +595,14 @@ chart.options.scales.x.min = 0;
 
 time.textContent = secToMinSec(endTime);
 
+// ★ input欄から最新の値を取り直す
+roastDate = document.getElementById("roastDate").value || "";
+country   = document.getElementById("country").value || "";
+farm      = document.getElementById("farm").value || "";
+variety   = document.getElementById("variety").value || "";
+process   = document.getElementById("process").value || "";
+altitude  = document.getElementById("altitude").value || "";
+
 // ===== 履歴に保存 =====
 const title =
   (roastDate || "no_date") + "_" +
