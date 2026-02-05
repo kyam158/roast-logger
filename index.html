@@ -115,6 +115,9 @@ function calcPhases(dryEnd, fc, endTime){
     devRate: (dev / total * 100).toFixed(1)
   };
 }
+function currentPhase(){
+  return calcPhases(dryEnd, fc, endTime);
+}
 /* =====================
    状態
 ===================== */
@@ -194,9 +197,6 @@ const chart=new Chart(
       }
     },
 
-function currentPhase(){
-  return calcPhases(dryEnd, fc, endTime);
-}
 
     /* ★ ここから追加 */
     plugins:[
@@ -270,7 +270,7 @@ drawLine(fc, fcTemp, "#e65100", "1st Crack");
       );
       ctx.restore();
     }
-  }
+  },
   {
   id:"phaseCompareText",
   afterDraw(chart){
