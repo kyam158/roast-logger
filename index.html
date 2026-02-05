@@ -97,6 +97,24 @@ const minSecToSec = str => {
   if(isNaN(m) || isNaN(s)) return null;
   return m * 60 + s;
 };
+function calcPhases(dryEnd, fc, endTime){
+  if(dryEnd == null || fc == null || endTime == null) return null;
+
+  const dry = dryEnd;
+  const mail = fc - dryEnd;
+  const dev = endTime - fc;
+
+  const total = endTime;
+
+  return {
+    dry,
+    mail,
+    dev,
+    dryRate: (dry / total * 100).toFixed(1),
+    mailRate: (mail / total * 100).toFixed(1),
+    devRate: (dev / total * 100).toFixed(1)
+  };
+}
 /* =====================
    状態
 ===================== */
@@ -117,6 +135,7 @@ let fcTemp=null;
 let dropTemp=null;
 let compareTempData = [];
 let compareLabel = "";
+let comparePhase = null;
 const tempData=[],gasData=[];
 
 const nowSec=()=> endTime ?? Math.floor((Date.now()-startTime)/1000);
@@ -174,6 +193,10 @@ const chart=new Chart(
         yR:{position:"right",min:0,max:5,grid:{drawOnChartArea:false}}
       }
     },
+
+function currentPhase(){
+  return calcPhases(dryEnd, fc, endTime);
+}
 
     /* ★ ここから追加 */
     plugins:[
@@ -248,6 +271,40 @@ drawLine(fc, fcTemp, "#e65100", "1st Crack");
       ctx.restore();
     }
   }
+  {
+  id:"phaseCompareText",
+  afterDraw(chart){
+    const cur = currentPhase();
+    if(!cur) return;
+
+    const ctx = chart.ctx;
+    const { left, top } = chart.chartArea;
+
+    let y = top + 60;
+
+    ctx.save();
+    ctx.font = "12px sans-serif";
+
+    // CURRENT
+    ctx.fillStyle = "#000";
+    ctx.fillText("CURRENT", left + 6, y); y += 14;
+    ctx.fillText(`Dry   ${secToMinSec(cur.dry)} (${cur.dryRate}%)`, left + 6, y); y += 14;
+    ctx.fillText(`Mail  ${secToMinSec(cur.mail)} (${cur.mailRate}%)`, left + 6, y); y += 14;
+    ctx.fillText(`Dev   ${secToMinSec(cur.dev)} (${cur.devRate}%)`, left + 6, y);
+
+    // COMPARE
+    if(comparePhase){
+      y += 18;
+      ctx.fillStyle = "#555";
+      ctx.fillText("COMPARE", left + 6, y); y += 14;
+      ctx.fillText(`Dry   ${secToMinSec(comparePhase.dry)} (${comparePhase.dryRate}%)`, left + 6, y); y += 14;
+      ctx.fillText(`Mail  ${secToMinSec(comparePhase.mail)} (${comparePhase.mailRate}%)`, left + 6, y); y += 14;
+      ctx.fillText(`Dev   ${secToMinSec(comparePhase.dev)} (${comparePhase.devRate}%)`, left + 6, y);
+    }
+
+    ctx.restore();
+  }
+}
 ]
   }
 );
@@ -684,6 +741,12 @@ compareSelect.onchange = e => {
   }
 
   const h = roastHistory[idx];
+  
+  comparePhase = calcPhases(
+  h.dryEnd,
+  h.fc,
+  h.endTime
+);
 
   compareTempData = h.tempData.map(d => ({
     x: d.x,
