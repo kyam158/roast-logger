@@ -118,21 +118,6 @@ function calcPhases(dryEnd, fc, endTime){
 function currentPhase(){
   return calcPhases(dryEnd, fc, endTime);
 }
-
-  const p2 = tempData[tempData.length - 1];
-  const p1 = tempData[tempData.length - 2];
-
-  const dt = p2.x - p1.x;
-  if(dt <= 0) return;
-
-  const dTemp = p2.y - p1.y;
-  const ror = dTemp / dt * 60;
-
-  rorData.push({
-    x: p2.x,
-    y: Number(ror.toFixed(1))
-  });
-}
 /* =====================
    状態
 ===================== */
@@ -263,7 +248,7 @@ const chart=new Chart(
       ticks:{ stepSize:5 }
     }
   }
-}
+},
 
     /* ★ ここから追加 */
     plugins:[
@@ -380,6 +365,7 @@ drawLine(fc, fcTemp, "#e65100", "1st Crack");
 ===================== */
 
 function calcRoRPerMinute(){
+  if(!startTime) return; 
   rorData.length = 0;
 
   for(let m = 1; m * 60 <= nowSec(); m++){
@@ -414,8 +400,8 @@ function draw(){
   calcRoRPerMinute();
   
   chart.data.datasets[0].data = tempData;
-  chart.data.datasets[2].data = gasData;
-  chart.data.datasets[3].data = rorData; // ★ 追加
+  chart.data.datasets[3].data = gasData;
+  chart.data.datasets[2].data = rorData; // ★ 追加
   chart.update();
 }
 /* =====================
