@@ -19,6 +19,27 @@ button,input{width:100%;padding:12px;margin:6px 0;font-size:16px}
 button {
   touch-action: manipulation;
 }
+
+/* ===== iPad専用 ===== */
+body.ipad {
+  font-size: 18px;
+}
+
+body.ipad #chartWrap {
+  height: 55vh;
+}
+
+body.ipad button,
+body.ipad input {
+  font-size: 18px;
+  padding: 14px;
+}
+
+/* ボタンを2列に（iPadは両手操作） */
+body.ipad .row {
+  gap: 10px;
+}
+
 </style>
 </head>
 
@@ -82,6 +103,15 @@ button {
 </div>
 
 <script>
+
+/* =====================
+   device判定（★追加）
+===================== */
+const isIPad =
+  navigator.userAgent.includes("iPad") ||
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+document.body.classList.add(isIPad ? "ipad" : "iphone");
 /* =====================
    util
 ===================== */
@@ -284,6 +314,21 @@ const chart=new Chart(
     x + 4,
     chartArea.top + 12
   );
+
+/* =====================
+   iPad / iPhone 分岐（★③ここ）
+===================== */
+if(isIPad){
+  // iPad：分析用
+  chart.options.scales.x.ticks.stepSize = 30; // 30秒刻み
+  chart.options.scales.y.max = 280;           // 高温まで表示
+  chart.options.scales.yRoR.max = 50;         // RoR余裕
+}else{
+  // iPhone：操作優先
+  chart.options.scales.x.ticks.stepSize = 60; // 1分刻み
+}
+
+chart.update();
 
   ctx.restore();
 }
