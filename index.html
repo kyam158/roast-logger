@@ -391,6 +391,22 @@ drawLine(fc, fcTemp, "#e65100", "1st Crack");
 ]
   }
 );
+
+
+/* =====================
+   iPad / iPhone 分岐（★③ここ）
+===================== */
+if(isIPad){
+  // iPad：分析用
+  chart.options.scales.x.ticks.stepSize = 30; // 30秒刻み
+  chart.options.scales.y.max = 280;           // 高温まで表示
+  chart.options.scales.yRoR.max = 50;         // RoR余裕
+}else{
+  // iPhone：操作優先
+  chart.options.scales.x.ticks.stepSize = 60; // 1分刻み
+}
+
+chart.update();
 /* =====================
    RoR計算
 ===================== */
