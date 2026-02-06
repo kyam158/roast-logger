@@ -361,28 +361,44 @@ drawLine(fc, fcTemp, "#e65100", "1st Crack");
   }
 );
 /* =====================
-   RoR（1分ごと）計算
+   RoR計算
 ===================== */
-
-function calcRoRPerMinute(){
-  if(!startTime) return; 
+function calcRoR(){
+  if(!startTime) return;
   rorData.length = 0;
 
-  for(let m = 1; m * 60 <= nowSec(); m++){
-    const t1 = (m - 1) * 60;
-    const t2 = m * 60;
+  /* ===== ① 1ハゼ以前：1分RoR ===== */
+  if(fc != null){
+    for(let m = 1; m * 60 <= fc; m++){
+      const t1 = (m - 1) * 60;
+      const t2 = m * 60;
 
-    // その時点までの最新温度を取得
-    const p1 = [...tempData].reverse().find(d => d.x <= t1);
-    const p2 = [...tempData].reverse().find(d => d.x <= t2);
+      const p1 = [...tempData].reverse().find(d => d.x <= t1);
+      const p2 = [...tempData].reverse().find(d => d.x <= t2);
+      if(!p1 || !p2) continue;
 
-    if(!p1 || !p2) continue;
+      rorData.push({
+        x: t2,
+        y: +(p2.y - p1.y).toFixed(1)
+      });
+    }
+  }
 
-    const ror = p2.y - p1.y;
+  /* ===== ② 1ハゼ以降：可変RoR ===== */
+  for(let i = 1; i < tempData.length; i++){
+    const prev = tempData[i - 1];
+    const cur  = tempData[i];
+
+    if(fc != null && cur.x <= fc) continue;
+
+    const dt = cur.x - prev.x;
+    if(dt <= 0) continue;
+
+    const ror = (cur.y - prev.y) * (60 / dt);
 
     rorData.push({
-      x: t2,
-      y: Number(ror.toFixed(1))
+      x: cur.x,
+      y: +ror.toFixed(1)
     });
   }
 }
