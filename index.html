@@ -226,38 +226,46 @@ const chart=new Chart(
       {label:"Gas",data:[],yAxisID:"yR",borderDash:[4,4]}
     ]},
     options:{
-      animation:false,
-      scales:{
-        x:{
-  type:"linear",
-  min:0,
-  ticks:{
-    stepSize:60,
-    callback:(value)=>{
-      const m = Math.floor(value / 60);
-      return `${m}:00`;
-    }
-  }
-},
-        y:{
-  min:0,
-  max:260,
-  ticks:{
-    stepSize:20
-  }
-},
-        yR:{position:"right",min:0,max:5,grid:{drawOnChartArea:false}}
+  animation:false,
+  scales:{
+    x:{
+      type:"linear",
+      min:0,
+      ticks:{
+        stepSize:60,
+        callback:(value)=>{
+          const m = Math.floor(value / 60);
+          return `${m}:00`;
+        }
       }
     },
-yRoR: {
-  position: "right",
-  min: 0,
-  max: 40,
-  grid: { drawOnChartArea: false },
-  ticks: {
-    stepSize: 5
+
+    // 温度
+    y:{
+      min:0,
+      max:260,
+      ticks:{ stepSize:20 }
+    },
+
+    // ガス
+    yR:{
+      position:"right",
+      min:0,
+      max:5,
+      grid:{ drawOnChartArea:false }
+    },
+
+    // ★ RoR（完全独立）
+    yRoR:{
+      position:"right",
+      min:0,
+      max:40,
+      offset:true,              // ← ガスとズラす（重要）
+      grid:{ drawOnChartArea:false },
+      ticks:{ stepSize:5 }
+    }
   }
-},
+}
 
     /* ★ ここから追加 */
     plugins:[
@@ -369,6 +377,32 @@ drawLine(fc, fcTemp, "#e65100", "1st Crack");
 ]
   }
 );
+/* =====================
+   RoR（1分ごと）計算
+===================== */
+const rorData = [];
+
+function calcRoRPerMinute(){
+  rorData.length = 0;
+
+  for(let m = 1; m * 60 <= nowSec(); m++){
+    const t1 = (m - 1) * 60;
+    const t2 = m * 60;
+
+    // その時点までの最新温度を取得
+    const p1 = [...tempData].reverse().find(d => d.x <= t1);
+    const p2 = [...tempData].reverse().find(d => d.x <= t2);
+
+    if(!p1 || !p2) continue;
+
+    const ror = p2.y - p1.y;
+
+    rorData.push({
+      x: t2,
+      y: Number(ror.toFixed(1))
+    });
+  }
+}
   /* =====================
    描画
 ===================== */
@@ -379,9 +413,12 @@ function draw(){
   time.textContent = fmt(t);
 
   chart.options.scales.x.max = Math.max(600, t + 10);
+  
+  calcRoRPerMinute();
+  
   chart.data.datasets[0].data = tempData;
-  chart.data.datasets[2].data = gasData;
-  chart.data.datasets[3].data = rorData; // ★ 追加
+  chart.data.datasets[1].data = gasData;
+  chart.data.datasets[2].data = rorData; // ★ 追加
   chart.update();
 }
 /* =====================
