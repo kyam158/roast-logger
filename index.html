@@ -118,6 +118,23 @@ function calcPhases(dryEnd, fc, endTime){
 function currentPhase(){
   return calcPhases(dryEnd, fc, endTime);
 }
+function calcRoR(){
+  if(tempData.length < 2) return;
+
+  const p2 = tempData[tempData.length - 1];
+  const p1 = tempData[tempData.length - 2];
+
+  const dt = p2.x - p1.x;
+  if(dt <= 0) return;
+
+  const dTemp = p2.y - p1.y;
+  const ror = dTemp / dt * 60;
+
+  rorData.push({
+    x: p2.x,
+    y: Number(ror.toFixed(1))
+  });
+}
 /* =====================
    状態
 ===================== */
@@ -139,6 +156,7 @@ let dropTemp=null;
 let compareTempData = [];
 let compareLabel = "";
 let comparePhase = null;
+const rorData = [];
 const tempData=[],gasData=[];
 
 const nowSec=()=> endTime ?? Math.floor((Date.now()-startTime)/1000);
@@ -189,6 +207,22 @@ const chart=new Chart(
   pointRadius:0
 },
 
+{
+  label: "RoR",
+  data: [],
+  yAxisID: "yRoR",
+  borderWidth: 2,
+  tension: 0.3,
+  pointRadius: 0,
+
+  segment: {
+    borderColor: () => {
+      if (startTime && !endTime) return "#1976d2"; // 焙煎中ブルー
+      return "#aaa"; // 履歴はグレー
+    }
+  }
+},
+
       {label:"Gas",data:[],yAxisID:"yR",borderDash:[4,4]}
     ]},
     options:{
@@ -215,7 +249,15 @@ const chart=new Chart(
         yR:{position:"right",min:0,max:5,grid:{drawOnChartArea:false}}
       }
     },
-
+yRoR: {
+  position: "right",
+  min: 0,
+  max: 40,
+  grid: { drawOnChartArea: false },
+  ticks: {
+    stepSize: 5
+  }
+},
 
     /* ★ ここから追加 */
     plugins:[
@@ -339,6 +381,7 @@ function draw(){
   chart.options.scales.x.max = Math.max(600, t + 10);
   chart.data.datasets[0].data = tempData;
   chart.data.datasets[2].data = gasData;
+  chart.data.datasets[3].data = rorData; // ★ 追加
   chart.update();
 }
 /* =====================
@@ -371,6 +414,7 @@ dropTemp = null;
 
   tempData.length=0;
   gasData.length=0;
+  rorData.length = 0;
 
   tempData.push({x:0,y:startTemp});
   gasData.push({x:0,y:gas});
@@ -383,6 +427,7 @@ dropTemp = null;
 tempSet.onclick=()=>{
   temp=parseInt(tempInput.value)||temp;
   tempData.push({x:nowSec(),y:temp});
+  calcRoR(); // ★ 追加
   draw();
 };
 
