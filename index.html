@@ -413,7 +413,7 @@ function draw(){
 
   chart.options.scales.x.max = Math.max(600, t + 10);
   
-  calcRoRPerMinute();
+  calcRoR();   // ← ★ ここだけ修正
   
   chart.data.datasets[0].data = tempData;
   chart.data.datasets[3].data = gasData;
