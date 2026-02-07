@@ -8,7 +8,7 @@
 
 <style>
 body{margin:0;font-family:-apple-system;background:#fafafa}
-#wrap{padding:10px}
+
 #chartWrap{height:45vh}
 button,input{width:100%;padding:12px;margin:6px 0;font-size:16px}
 .row{display:flex;gap:6px}
@@ -20,14 +20,29 @@ button {
   touch-action: manipulation;
 }
 
+/* ===== iPad 横並びUI ===== */
+body.ipad #container {
+  display: flex;
+  flex-direction: row;
+  height: 100vh;
+}
+
+body.ipad #chartWrap {
+  flex: 1.2;
+  height: 60vh;
+}
+
+body.ipad #panel {
+  flex: 1;
+  overflow-y: auto;
+  padding-left: 10px;
+  background: #fff;
+}
 /* ===== iPad専用 ===== */
 body.ipad {
   font-size: 18px;
 }
 
-body.ipad #chartWrap {
-  height: 55vh;
-}
 
 body.ipad button,
 body.ipad input {
@@ -44,63 +59,72 @@ body.ipad .row {
 </head>
 
 <body>
-<div id="wrap">
-  <div id="chartWrap"><canvas id="chart"></canvas></div>
-  <div id="time">0:00</div>
-  
-  <label>豆情報</label>
 
-<input id="roastDate" type="date">
+<div id="container">
 
-<input id="country" placeholder="国名（例：Ethiopia）">
-<input id="farm" placeholder="農園名">
-<input id="variety" placeholder="品種">
-<input id="process" placeholder="精製方法（Washed / Natural など）">
-<input id="altitude" placeholder="標高（m）">
-
-<label>開始温度 (℃)</label>
-<div class="row">
-  <input id="startTempInput" type="number" value="150">
-</div>
-  <button id="startBtn">焙煎開始</button>
-
-  <label>豆温 (℃)</label>
-  <div class="row">
-    <input id="tempInput" type="number" value="150">
-    <button id="tempSet">決定</button>
+  <!-- グラフ -->
+  <div id="chartWrap">
+    <canvas id="chart"></canvas>
   </div>
 
-  <label>ガス圧</label>
-<div class="row">
-  <button id="gasDown">−</button>
-  <div id="gasLabel" style="text-align:center;font-size:20px;line-height:48px">
-    2.5
-  </div>
-  <button id="gasUp">＋</button>
-</div>
-<div class="row">
-  <input id="gasInput" type="number" step="0.1" min="0" max="5" value="2.5">
-  <button id="gasSet">決定</button>
-</div>
+  <!-- 操作パネル -->
+  <div id="panel">
+    <div id="time">0:00</div>
 
-<button id="chargeBtn">Charge</button>
-<button id="tpBtn">Turning Point</button>
-  <button id="dryBtn">Dry End（長押し）</button>
-  <button id="fcBtn">1ハゼ（長押し）</button>
-  <button id="dropBtn">DROP</button>
+    <label>豆情報</label>
 
-  <button id="csvBtn">CSV書き出し</button>
-<input id="loadCsv" type="file" accept=".csv">
-  
-  <select id="historySelect">
-  <option value="">焙煎履歴を選択</option>
-</select>
-    
+    <input id="roastDate" type="date">
+    <input id="country" placeholder="国名（例：Ethiopia）">
+    <input id="farm" placeholder="農園名">
+    <input id="variety" placeholder="品種">
+    <input id="process" placeholder="精製方法（Washed / Natural など）">
+    <input id="altitude" placeholder="標高（m）">
+
+    <label>開始温度 (℃)</label>
+    <div class="row">
+      <input id="startTempInput" type="number" value="150">
+    </div>
+    <button id="startBtn">焙煎開始</button>
+
+    <label>豆温 (℃)</label>
+    <div class="row">
+      <input id="tempInput" type="number" value="150">
+      <button id="tempSet">決定</button>
+    </div>
+
+    <label>ガス圧</label>
+    <div class="row">
+      <button id="gasDown">−</button>
+      <div id="gasLabel" style="text-align:center;font-size:20px;line-height:48px">2.5</div>
+      <button id="gasUp">＋</button>
+    </div>
+
+    <div class="row">
+      <input id="gasInput" type="number" step="0.1" min="0" max="5" value="2.5">
+      <button id="gasSet">決定</button>
+    </div>
+
+    <button id="chargeBtn">Charge</button>
+    <button id="tpBtn">Turning Point</button>
+    <button id="dryBtn">Dry End（長押し）</button>
+    <button id="fcBtn">1ハゼ（長押し）</button>
+    <button id="dropBtn">DROP</button>
+
+    <button id="csvBtn">CSV書き出し</button>
+    <input id="loadCsv" type="file" accept=".csv">
+
+    <select id="historySelect">
+      <option value="">焙煎履歴を選択</option>
+    </select>
+
     <select id="compareSelect">
-  <option value="">比較焙煎を選択</option>
-</select>
+      <option value="">比較焙煎を選択</option>
+    </select>
 
-</div>
+  </div> <!-- panel -->
+
+</div> <!-- container -->
+
 
 <script>
 
