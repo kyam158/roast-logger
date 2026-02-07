@@ -54,7 +54,30 @@ body.ipad input {
 body.ipad .row {
   gap: 10px;
 }
+/* === iPhone/iPad キーボード画面固定対策 === */
+html, body {
+  height: 100%;
+  position: fixed; 
+  overflow: hidden;
+}
 
+body {
+  touch-action: manipulation;
+}
+
+/* iOSが勝手にズームするのを防ぐ */
+input, textarea {
+  font-size: 16px;
+}
+/* ==== iOS キーボード完全対策 ==== */
+body {
+  position: relative;
+}
+
+#container {
+  height: 100vh;
+  overflow: hidden;
+}
 </style>
 </head>
 
@@ -429,7 +452,24 @@ if(isIPad){
   // iPhone：操作優先
   chart.options.scales.x.ticks.stepSize = 60; // 1分刻み
 }
+// ===== iOSキーボード画面ジャンプ完全防止 =====
+let scrollY = 0;
 
+document.querySelectorAll("input, textarea").forEach(el=>{
+  el.addEventListener("focus", ()=>{
+    scrollY = window.scrollY;
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+  });
+
+  el.addEventListener("blur", ()=>{
+    document.body.style.position = "";
+    document.body.style.top = "";
+    document.body.style.width = "";
+    window.scrollTo(0, scrollY);
+  });
+});
 chart.update();
 /* =====================
    RoR計算
