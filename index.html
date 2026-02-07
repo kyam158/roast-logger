@@ -55,12 +55,25 @@ body.ipad .row {
   gap: 10px;
 }
 /* === iPhone/iPad キーボード画面固定対策 === */
+/* デフォルト：iPhoneはスクロール可 */
 html, body {
   height: 100%;
-  position: fixed; 
+  overflow: auto;
+}
+
+#container {
+  min-height: 100vh;
+}
+
+/* ===== iPadだけ固定分析UI ===== */
+body.ipad, body.ipad html {
   overflow: hidden;
 }
 
+body.ipad #container {
+  height: 100vh;
+  overflow: hidden;
+}
 body {
   touch-action: manipulation;
 }
@@ -74,10 +87,7 @@ body {
   position: relative;
 }
 
-#container {
-  height: 100vh;
-  overflow: hidden;
-}
+
 </style>
 </head>
 
