@@ -3,1049 +3,257 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Roast Logger</title>
+<title>Roast Logger Pro</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
 <style>
 body{margin:0;font-family:-apple-system;background:#fafafa}
+#container{min-height:100vh}
 
 #chartWrap{height:45vh}
-button,input{width:100%;padding:12px;margin:6px 0;font-size:16px}
+button,input,select{width:100%;padding:12px;margin:6px 0;font-size:16px}
 .row{display:flex;gap:6px}
 .row>*{flex:1}
 #dropBtn{background:#d32f2f;color:#fff;font-weight:bold}
 #csvBtn{background:#1976d2;color:#fff}
 #time{text-align:center;font-size:22px;margin:6px 0}
-button {
-  touch-action: manipulation;
-}
+
+button{touch-action:manipulation}
 
 /* ===== iPad 横並びUI ===== */
-body.ipad #container {
-  display: flex;
-  flex-direction: row;
-  height: 100vh;
-}
+body.ipad #container{display:flex;flex-direction:row;height:100vh}
+body.ipad #chartWrap{flex:1.2;height:60vh}
+body.ipad #panel{flex:1;overflow-y:auto;padding-left:10px;background:#fff}
+body.ipad{font-size:18px}
+body.ipad button,body.ipad input{font-size:18px;padding:14px}
 
-body.ipad #chartWrap {
-  flex: 1.2;
-  height: 60vh;
-}
+/* ===== Log Table ===== */
+#logTableWrap{max-height:30vh;overflow-y:auto;background:#fff;border-top:2px solid #000}
+#logTable{width:100%;border-collapse:collapse;font-size:12px}
+#logTable th,#logTable td{border:1px solid #444;padding:2px 4px;text-align:center}
+#logTable thead{position:sticky;top:0;background:#000;color:#fff}
 
-body.ipad #panel {
-  flex: 1;
-  overflow-y: auto;
-  padding-left: 10px;
-  background: #fff;
-}
-/* ===== iPad専用 ===== */
-body.ipad {
-  font-size: 18px;
-}
-
-
-body.ipad button,
-body.ipad input {
-  font-size: 18px;
-  padding: 14px;
-}
-
-/* ボタンを2列に（iPadは両手操作） */
-body.ipad .row {
-  gap: 10px;
-}
-/* === iPhone/iPad キーボード画面固定対策 === */
-/* デフォルト：iPhoneはスクロール可 */
-html, body {
-  height: 100%;
-  overflow: auto;
-}
-
-#container {
-  min-height: 100vh;
-}
-
-/* ===== iPadだけ固定分析UI ===== */
-body.ipad, body.ipad html {
-  overflow: hidden;
-}
-
-body.ipad #container {
-  height: 100vh;
-  overflow: hidden;
-}
-body {
-  touch-action: manipulation;
-}
-
-/* iOSが勝手にズームするのを防ぐ */
-input, textarea {
-  font-size: 16px;
-}
-/* ==== iOS キーボード完全対策 ==== */
-body {
-  position: relative;
-}
-
-#logTableWrap{
-  max-height: 30vh;
-  overflow-y: auto;
-  background:#fff;
-  border-top:2px solid #000;
-}
-
-#logTable{
-  width:100%;
-  border-collapse:collapse;
-  font-size:12px;
-}
-
-#logTable th,#logTable td{
-  border:1px solid #444;
-  padding:2px 4px;
-  text-align:center;
-}
-
-#logTable thead{
-  position:sticky;
-  top:0;
-  background:#000;
-  color:#fff;
-}
-
+/* iOS zoom防止 */
+input,textarea{font-size:16px}
 </style>
 </head>
 
 <body>
-
 <div id="container">
 
-  <!-- グラフ -->
-  <div id="chartWrap">
-    <canvas id="chart"></canvas>
-  </div>
-  
-  <div id="logTableWrap">
-  <table id="logTable">
-    <thead>
-      <tr>
-        <th>Time</th>
-        <th>Temp °C</th>
-        <th>Gas</th>
-        <th>Air</th>
-        <th>RoR</th>
-        <th>Note</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+<!-- グラフ -->
+<div id="chartWrap"><canvas id="chart"></canvas></div>
+
+<!-- ログ表 -->
+<div id="logTableWrap">
+<table id="logTable">
+<thead>
+<tr>
+<th>Time</th><th>Temp</th><th>Gas</th><th>Air</th><th>RoR</th><th>Note</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
 </div>
 
-  <!-- 操作パネル -->
-  <div id="panel">
-    <div id="time">0:00</div>
+<!-- 操作パネル -->
+<div id="panel">
+<div id="time">0:00</div>
 
-    <label>豆情報</label>
+<label>豆情報</label>
+<input id="roastDate" type="date">
+<input id="country" placeholder="Country">
+<input id="farm" placeholder="Farm">
+<input id="variety" placeholder="Variety">
+<input id="process" placeholder="Process">
+<input id="altitude" placeholder="Altitude (m)">
 
-    <input id="roastDate" type="date">
-    <input id="country" placeholder="国名（例：Ethiopia）">
-    <input id="farm" placeholder="農園名">
-    <input id="variety" placeholder="品種">
-    <input id="process" placeholder="精製方法（Washed / Natural など）">
-    <input id="altitude" placeholder="標高（m）">
+<label>開始温度</label>
+<input id="startTempInput" type="number" value="150">
+<button id="startBtn">焙煎開始</button>
 
-    <label>開始温度 (℃)</label>
-    <div class="row">
-      <input id="startTempInput" type="number" value="150">
-    </div>
-    <button id="startBtn">焙煎開始</button>
+<label>豆温</label>
+<div class="row">
+<input id="tempInput" type="number" value="150">
+<button id="tempSet">決定</button>
+</div>
 
-    <label>豆温 (℃)</label>
-    <div class="row">
-      <input id="tempInput" type="number" value="150">
-      <button id="tempSet">決定</button>
-    </div>
+<label>Gas</label>
+<div class="row">
+<button id="gasDown">−</button>
+<div id="gasLabel" style="text-align:center;font-size:20px;line-height:48px">2.5</div>
+<button id="gasUp">＋</button>
+</div>
 
-    <label>ガス圧</label>
-    <div class="row">
-      <button id="gasDown">−</button>
-      <div id="gasLabel" style="text-align:center;font-size:20px;line-height:48px">2.5</div>
-      <button id="gasUp">＋</button>
-    </div>
+<div class="row">
+<input id="gasInput" type="number" step="0.1" value="2.5">
+<button id="gasSet">決定</button>
+</div>
 
-    <div class="row">
-      <input id="gasInput" type="number" step="0.1" min="0" max="5" value="2.5">
-      <button id="gasSet">決定</button>
-    </div>
+<button id="chargeBtn">Charge</button>
+<button id="tpBtn">Turning Point</button>
+<button id="dryBtn">Dry End（長押し）</button>
+<button id="fcBtn">1st Crack（長押し）</button>
+<button id="dropBtn">DROP</button>
 
-    <button id="chargeBtn">Charge</button>
-    <button id="tpBtn">Turning Point</button>
-    <button id="dryBtn">Dry End（長押し）</button>
-    <button id="fcBtn">1ハゼ（長押し）</button>
-    <button id="dropBtn">DROP</button>
+<button id="csvBtn">CSV Export</button>
+<input id="loadCsv" type="file" accept=".csv">
 
-    <button id="csvBtn">CSV書き出し</button>
-    <input id="loadCsv" type="file" accept=".csv">
+<select id="historySelect"><option value="">履歴</option></select>
+<select id="compareSelect"><option value="">比較</option></select>
 
-    <select id="historySelect">
-      <option value="">焙煎履歴を選択</option>
-    </select>
-
-    <select id="compareSelect">
-      <option value="">比較焙煎を選択</option>
-    </select>
-
-  </div> <!-- panel -->
-
-</div> <!-- container -->
-
+</div>
+</div>
 
 <script>
-
-/* =====================
-   device判定（★追加）
-===================== */
+/* ===== Device判定 ===== */
 const isIPad =
-  navigator.userAgent.includes("iPad") ||
-  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+ navigator.userAgent.includes("iPad") ||
+ (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
+document.body.classList.add(isIPad?"ipad":"iphone");
 
-document.body.classList.add(isIPad ? "ipad" : "iphone");
-/* =====================
-   util
-===================== */
-const fmt = s =>
-  `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
-
-const secToMinSec = s =>
-  `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
-
-const minSecToSec = str => {
-  if(!str) return null;
-  const [m,s] = str.split(":").map(Number);
-  if(isNaN(m) || isNaN(s)) return null;
-  return m * 60 + s;
+/* ===== util ===== */
+const fmt=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
+const secToMinSec=fmt;
+const minSecToSec=str=>{
+ if(!str)return null;
+ const [m,s]=str.split(":").map(Number);
+ return m*60+s;
 };
-function calcPhases(dryEnd, fc, endTime){
-  if(dryEnd == null || fc == null || endTime == null) return null;
 
-  const dry = dryEnd;
-  const mail = fc - dryEnd;
-  const dev = endTime - fc;
-
-  const total = endTime;
-
-  return {
-    dry,
-    mail,
-    dev,
-    dryRate: (dry / total * 100).toFixed(1),
-    mailRate: (mail / total * 100).toFixed(1),
-    devRate: (dev / total * 100).toFixed(1)
-  };
-}
-function currentPhase(){
-  return calcPhases(dryEnd, fc, endTime);
-}
-/* =====================
-   状態
-===================== */
-let roastDate = "";
-let country = "";
-let farm = "";
-let variety = "";
-let process = "";
-let altitude = "";
+/* ===== 状態 ===== */
 let startTime=null,endTime=null,timer=null;
-let startTemp = 150;
-let temp=150,gas=2.5;
-let dryEnd=null,fc=null;
-let charge=null,tp=null;
-let tpTemp=null;
-let dryEndTemp=null;
-let fcTemp=null;
-let dropTemp=null;
-let compareTempData = [];
-let compareLabel = "";
-let comparePhase = null;
-const rorData = [];
-const tempData=[],gasData=[];
+let temp=150,gas=2.5,startTemp=150;
+let charge=null,tp=null,dryEnd=null,fc=null;
+let tpTemp,dryEndTemp,fcTemp,dropTemp;
+const tempData=[],gasData=[],rorData=[];
+const roastHistory=[];
+let compareTempData=[],comparePhase=null;
 
-const nowSec=()=> endTime ?? Math.floor((Date.now()-startTime)/1000);
-const roastHistory = [];
-/* =====================
-   Chart
-===================== */
-const chart=new Chart(
-  document.getElementById("chart"),
-  {
-    type:"line",
-    data:{datasets:[
-      
-      {
-  label: "Temp",
-  data: [],
-  borderWidth: 2,
-  tension: 0.3,
-  cubicInterpolationMode: "monotone",
-  pointRadius: 0,
+const nowSec=()=>endTime??Math.floor((Date.now()-startTime)/1000);
 
-  segment: {
-    borderColor: ctx => {
-      // p1 が無い時（最初の1点など）
-      if (!ctx.p1) return "#e53935";
-
-      const t = ctx.p1.parsed.x;
-
-      // 焙煎中なら色付き
-      if (startTime && !endTime) {
-        return "#e53935"; // 🔥 焙煎中の色
-      }
-
-      // 履歴・比較表示はグレー
-      return "#999";
-    }
-  }
-},
-    
-{
-  label:"Compare Temp",
-  data:[],
-  borderWidth:2,
-  tension:0.3,
-  cubicInterpolationMode:"monotone",
-  borderColor:"rgba(0,0,0,0.3)",
-  borderDash:[6,4],
-  pointRadius:0
-},
-
-{
-  label: "RoR",
-  data: [],
-  yAxisID: "yRoR",
-  borderWidth: 2,
-  tension: 0.3,
-  pointRadius: 0,
-
-  segment: {
-    borderColor: () => {
-      if (startTime && !endTime) return "#1976d2"; // 焙煎中ブルー
-      return "#aaa"; // 履歴はグレー
-    }
-  }
-},
-
-      {label:"Gas",data:[],yAxisID:"yR",borderDash:[4,4]}
-    ]},
-    options:{
+/* ===== Chart ===== */
+const chart=new Chart(chartCanvas=document.getElementById("chart"),{
+ type:"line",
+ data:{datasets:[
+  {label:"Temp",data:[],borderWidth:2,tension:.3,pointRadius:0},
+  {label:"Compare",data:[],borderDash:[6,4],borderColor:"#999",pointRadius:0},
+  {label:"RoR",data:[],yAxisID:"yRoR",borderWidth:2,tension:.3,pointRadius:0},
+  {label:"Gas",data:[],yAxisID:"yR",borderDash:[4,4]}
+ ]},
+ options:{
   animation:false,
   scales:{
-    x:{
-      type:"linear",
-      min:0,
-      ticks:{
-        stepSize:60,
-        callback:(value)=>{
-          const m = Math.floor(value / 60);
-          return `${m}:00`;
-        }
-      }
-    },
-
-    // 温度
-    y:{
-      min:0,
-      max:260,
-      ticks:{ stepSize:20 }
-    },
-
-    // ガス
-    yR:{
-      position:"right",
-      min:0,
-      max:5,
-      grid:{ drawOnChartArea:false }
-    },
-
-    // ★ RoR（完全独立）
-    yRoR:{
-      position:"right",
-      min:0,
-      max:40,
-      offset:true,              // ← ガスとズラす（重要）
-      grid:{ drawOnChartArea:false },
-      ticks:{ stepSize:5 }
-    }
+   x:{type:"linear",min:0,ticks:{stepSize:60,callback:v=>`${Math.floor(v/60)}:00`}},
+   y:{min:0,max:260,ticks:{stepSize:20}},
+   yR:{position:"right",min:0,max:5,grid:{drawOnChartArea:false}},
+   yRoR:{position:"right",min:0,max:40,offset:true,grid:{drawOnChartArea:false}}
   }
-},
-
-    /* ★ ここから追加 */
-    plugins:[
-      {
-        id:"phaseMarkers",
-        afterDraw(chart){
-          const {ctx,scales,chartArea}=chart;
-
-          function drawLine(t, tempValue, color, label){
-  if(t==null) return;
-
-  const x = scales.x.getPixelForValue(t);
-
-  ctx.save();
-
-  // 縦線
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(x, chartArea.top);
-  ctx.lineTo(x, chartArea.bottom);
-  ctx.stroke();
-
-  // ラベル（文字）
-  ctx.fillStyle = color;
-  ctx.font = "12px sans-serif";
-
-  const tempText =
-    tempValue != null ? ` ${tempValue}℃` : "";
-
-  ctx.fillText(
-    label + tempText,
-    x + 4,
-    chartArea.top + 12
-  );
-
-
-  ctx.restore();
-}
-drawLine(charge, startTemp, "#1565c0", "Charge");
-drawLine(tp, tpTemp, "#2e7d32", "TP");
-drawLine(dryEnd, dryEndTemp, "#f9a825", "Dry End");
-drawLine(fc, fcTemp, "#e65100", "1st Crack");
-        }
-      },
-       // ★★★ ここに追加 ★★★
-  {
-    id:"developmentText",
-    afterDraw(chart){
-      if(fc == null || endTime == null) return;
-
-      const ctx = chart.ctx;
-      const { left, top } = chart.chartArea;
-
-      const devTime = endTime - fc;
-      const devRate = (devTime / endTime * 100).toFixed(1);
-
-      const m = Math.floor(devTime / 60);
-      const s = devTime % 60;
-
-      ctx.save();
-      ctx.fillStyle = "#e53935";
-      ctx.font = "bold 14px sans-serif";
-      ctx.fillText("DEVELOPMENT", left + 6, top + 16);
-
-      ctx.fillStyle = "#333";
-      ctx.font = "13px sans-serif";
-      ctx.fillText(
-        `${m}:${String(s).padStart(2,"0")} (${devRate}%)`,
-        left + 6,
-        top + 34
-      );
-      ctx.restore();
-    }
-  },
-  {
-  id:"phaseCompareText",
-  afterDraw(chart){
-    const cur = currentPhase();
-    if(!cur) return;
-
-    const ctx = chart.ctx;
-    const { left, top } = chart.chartArea;
-
-    let y = top + 60;
-
-    ctx.save();
-    ctx.font = "12px sans-serif";
-
-    // CURRENT
-    ctx.fillStyle = "#000";
-    ctx.fillText("CURRENT", left + 6, y); y += 14;
-    ctx.fillText(`Dry   ${secToMinSec(cur.dry)} (${cur.dryRate}%)`, left + 6, y); y += 14;
-    ctx.fillText(`Mail  ${secToMinSec(cur.mail)} (${cur.mailRate}%)`, left + 6, y); y += 14;
-    ctx.fillText(`Dev   ${secToMinSec(cur.dev)} (${cur.devRate}%)`, left + 6, y);
-
-    // COMPARE
-    if(comparePhase){
-      y += 18;
-      ctx.fillStyle = "#555";
-      ctx.fillText("COMPARE", left + 6, y); y += 14;
-      ctx.fillText(`Dry   ${secToMinSec(comparePhase.dry)} (${comparePhase.dryRate}%)`, left + 6, y); y += 14;
-      ctx.fillText(`Mail  ${secToMinSec(comparePhase.mail)} (${comparePhase.mailRate}%)`, left + 6, y); y += 14;
-      ctx.fillText(`Dev   ${secToMinSec(comparePhase.dev)} (${comparePhase.devRate}%)`, left + 6, y);
-    }
-
-    ctx.restore();
-  }
-}
-]
-  }
-);
-
-
-/* =====================
-   iPad / iPhone 分岐（★③ここ）
-===================== */
-if(isIPad){
-  // iPad：分析用
-  chart.options.scales.x.ticks.stepSize = 30; // 30秒刻み
-  chart.options.scales.y.max = 280;           // 高温まで表示
-  chart.options.scales.yRoR.max = 50;         // RoR余裕
-}else{
-  // iPhone：操作優先
-  chart.options.scales.x.ticks.stepSize = 60; // 1分刻み
-}
-// ===== iOSキーボード画面ジャンプ完全防止 =====
-let scrollY = 0;
-
-document.querySelectorAll("input, textarea").forEach(el=>{
-  el.addEventListener("focus", ()=>{
-    scrollY = window.scrollY;
-    document.body.style.position = "fixed";
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.width = "100%";
-  });
-
-  el.addEventListener("blur", ()=>{
-    document.body.style.position = "";
-    document.body.style.top = "";
-    document.body.style.width = "";
-    window.scrollTo(0, scrollY);
-  });
+ }
 });
-chart.update();
-/* =====================
-   RoR計算
-===================== */
+
+/* ===== RoR計算 ===== */
 function calcRoR(){
-  if(!startTime) return;
-  rorData.length = 0;
-
-  /* ===== ① 1ハゼ以前：1分RoR ===== */
-  if(fc != null){
-    for(let m = 1; m * 60 <= fc; m++){
-      const t1 = (m - 1) * 60;
-      const t2 = m * 60;
-
-      const p1 = [...tempData].reverse().find(d => d.x <= t1);
-      const p2 = [...tempData].reverse().find(d => d.x <= t2);
-      if(!p1 || !p2) continue;
-
-      rorData.push({
-        x: t2,
-        y: +(p2.y - p1.y).toFixed(1)
-      });
-    }
-  }
-
-  /* ===== ② 1ハゼ以降：可変RoR ===== */
-  for(let i = 1; i < tempData.length; i++){
-    const prev = tempData[i - 1];
-    const cur  = tempData[i];
-
-    if(fc != null && cur.x <= fc) continue;
-
-    const dt = cur.x - prev.x;
-    if(dt <= 0) continue;
-
-    const ror = (cur.y - prev.y) * (60 / dt);
-
-    rorData.push({
-      x: cur.x,
-      y: +ror.toFixed(1)
-    });
-  }
-  }
-  function updateLogTable(){
-  const tbody = document.querySelector("#logTable tbody");
-  tbody.innerHTML = "";
-
-  // 1分刻み表示
-  for(let sec = 0; sec <= nowSec(); sec += 60){
-
-    const tempPoint = [...tempData].reverse().find(d=>d.x<=sec);
-    const gasPoint  = [...gasData].reverse().find(d=>d.x<=sec);
-    const rorPoint  = [...rorData].reverse().find(d=>d.x<=sec);
-
-    const tr = document.createElement("tr");
-
-    tr.innerHTML = `
-      <td>${secToMinSec(sec)}</td>
-      <td>${tempPoint ? tempPoint.y.toFixed(0) : ""}</td>
-      <td>${gasPoint ? gasPoint.y.toFixed(1) : ""}</td>
-      <td></td>
-      <td>${rorPoint ? rorPoint.y.toFixed(1) : ""}</td>
-      <td></td>
-    `;
-    tbody.appendChild(tr);
-  }
+ rorData.length=0;
+ for(let i=1;i<tempData.length;i++){
+  const p=tempData[i-1],c=tempData[i];
+  const dt=c.x-p.x;if(dt<=0)continue;
+  const r=(c.y-p.y)*(60/dt);
+  rorData.push({x:c.x,y:+r.toFixed(1)});
+ }
 }
+
+/* ===== ログ表更新（★外に置く） ===== */
+function updateLogTable(){
+ const tbody=document.querySelector("#logTable tbody");
+ tbody.innerHTML="";
+ for(let sec=0;sec<=nowSec();sec+=60){
+  const t=[...tempData].reverse().find(d=>d.x<=sec);
+  const g=[...gasData].reverse().find(d=>d.x<=sec);
+  const r=[...rorData].reverse().find(d=>d.x<=sec);
+  const tr=document.createElement("tr");
+  tr.innerHTML=`
+   <td>${secToMinSec(sec)}</td>
+   <td>${t?t.y.toFixed(0):""}</td>
+   <td>${g?g.y.toFixed(1):""}</td>
+   <td></td>
+   <td>${r?r.y.toFixed(1):""}</td>
+   <td></td>`;
+  tbody.appendChild(tr);
+ }
 }
-  /* =====================
-   描画
-===================== */
+
+/* ===== 描画 ===== */
 function draw(){
-  if(!startTime) return;
-
-  const t = nowSec();
-  time.textContent = fmt(t);
-
-  chart.options.scales.x.max = Math.max(600, t + 10);
-  
-  calcRoR();   // ← ★ ここだけ修正
-  
-  chart.data.datasets[0].data = tempData;
-  chart.data.datasets[3].data = gasData;
-  chart.data.datasets[2].data = rorData; // ★ 追加
-  chart.update();
-  
-  updateLogTable(); // ★★★ ここに追加
-
+ if(!startTime)return;
+ const t=nowSec();
+ time.textContent=fmt(t);
+ chart.options.scales.x.max=Math.max(600,t+10);
+ calcRoR();
+ chart.data.datasets[0].data=tempData;
+ chart.data.datasets[2].data=rorData;
+ chart.data.datasets[3].data=gasData;
+ chart.update();
+ updateLogTable();
 }
-/* =====================
-   操作
-===================== */
+
+/* ===== 操作 ===== */
 startBtn.onclick=()=>{
-  roastDate = document.getElementById("roastDate").value || "";
-  country   = document.getElementById("country").value || "";
-  farm      = document.getElementById("farm").value || "";
-  variety   = document.getElementById("variety").value || "";
-  process   = document.getElementById("process").value || "";
-  altitude  = document.getElementById("altitude").value || "";
-
-charge = null;
-tp = null;
-dryEnd = null;
-fc = null;
-
-tpTemp = null;
-dryEndTemp = null;
-fcTemp = null;
-dropTemp = null;
-
-  startTemp = parseInt(startTempInput.value) || startTemp;
-  temp = startTemp;
-
-  startTime=Date.now();
-  endTime=null;
-  dryEnd=fc=null;
-
-  tempData.length=0;
-  gasData.length=0;
-  rorData.length = 0;
-
-  tempData.push({x:0,y:startTemp});
-  gasData.push({x:0,y:gas});
-
-  clearInterval(timer);
-  timer=setInterval(draw,1000);
-  draw();
+ startTemp=parseInt(startTempInput.value)||150;
+ temp=startTemp;
+ startTime=Date.now();endTime=null;
+ tempData.length=0;gasData.length=0;rorData.length=0;
+ tempData.push({x:0,y:startTemp});
+ gasData.push({x:0,y:gas});
+ clearInterval(timer);
+ timer=setInterval(draw,1000);
+ draw();
 };
 
 tempSet.onclick=()=>{
-  temp=parseInt(tempInput.value)||temp;
-  tempData.push({x:nowSec(),y:temp});
-  draw();
+ temp=parseInt(tempInput.value)||temp;
+ tempData.push({x:nowSec(),y:temp});
+ draw();
 };
 
-const setGas = v => {
-  gas = Math.min(5, Math.max(0, Number(v.toFixed(1))));
-  gasLabel.textContent = gas.toFixed(1);
-  gasInput.value = gas.toFixed(1);   // ← ★これ追加
-  gasData.push({ x: nowSec(), y: gas });
-  draw();
+const setGas=v=>{
+ gas=Math.min(5,Math.max(0,Number(v.toFixed(1))));
+ gasLabel.textContent=gas.toFixed(1);
+ gasInput.value=gas.toFixed(1);
+ gasData.push({x:nowSec(),y:gas});
+ draw();
 };
-gasUp.onpointerdown = e => {
-  e.preventDefault();
-  setGas(gas + 0.1);
-};
+gasUp.onpointerdown=e=>{e.preventDefault();setGas(gas+0.1);}
+gasDown.onpointerdown=e=>{e.preventDefault();setGas(gas-0.1);}
+gasSet.onclick=()=>setGas(parseFloat(gasInput.value));
 
-gasDown.onpointerdown = e => {
-  e.preventDefault();
-  setGas(gas - 0.1);
-};
-gasSet.onclick = () => {
-  const v = parseFloat(gasInput.value);
-  if (isNaN(v)) return;
-  setGas(v);
-};
-
-/* =====================
-   長押し
-===================== */
+/* 長押し */
 let hold=null;
 const holdStart=f=>hold=setTimeout(f,600);
 const holdCancel=()=>clearTimeout(hold);
 
-dryBtn.onpointerdown = e => {
-  e.preventDefault();
-  holdStart(()=>{
-    dryEnd = nowSec();
-    dryEndTemp = temp;   // ★ 温度
-  });
-};
-fcBtn.onpointerdown = e => {
-  e.preventDefault();
-  holdStart(()=>{
-    fc = nowSec();
-    fcTemp = temp;   // ★ 温度
-  });
-};
-[dryBtn,fcBtn].forEach(b=>{
-  b.onpointerup = holdCancel;
-  b.onpointercancel = holdCancel;
+dryBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>{dryEnd=nowSec();dryEndTemp=temp;});};
+fcBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>{fc=nowSec();fcTemp=temp;});};
+[dryBtn,fcBtn].forEach(b=>{b.onpointerup=holdCancel;b.onpointercancel=holdCancel;});
+
+chargeBtn.onclick=()=>{charge=nowSec();};
+tpBtn.onclick=()=>{tp=nowSec();tpTemp=temp;};
+dropBtn.onclick=()=>{endTime=nowSec();dropTemp=temp;clearInterval(timer);draw();};
+
+/* iOSキーボード画面固定防止 */
+let scrollY=0;
+document.querySelectorAll("input").forEach(el=>{
+ el.addEventListener("focus",()=>{
+  scrollY=window.scrollY;
+  document.body.style.position="fixed";
+  document.body.style.top=`-${scrollY}px`;
+ });
+ el.addEventListener("blur",()=>{
+  document.body.style.position="";
+  document.body.style.top="";
+  window.scrollTo(0,scrollY);
+ });
 });
-chargeBtn.onclick = () => {
-  if(!startTime) return;
-  charge = nowSec();
-  draw();
-};
-
-tpBtn.onclick = () => {
-  if(!startTime) return;
-  tp = nowSec();
-  tpTemp = temp;   // ★ 温度を保存
-  draw();
-};
-/* =====================
-   DROP
-===================== */
-dropBtn.onclick = () => {
-  if(!startTime || endTime) return;
-  endTime = nowSec();
-  dropTemp = temp;   // ★ 温度
-  clearInterval(timer);
-  draw();
-};
-
-/* =====================
-   CSV書き出し
-===================== */
-csvBtn.onclick=()=>{
-  if(!tempData.length) return alert("データなし");
-
-  // ★ ここを追加（最新の入力値を取り直す）
-  roastDate = document.getElementById("roastDate").value || "";
-  country   = document.getElementById("country").value || "";
-  farm      = document.getElementById("farm").value || "";
-  variety   = document.getElementById("variety").value || "";
-  process   = document.getElementById("process").value || "";
-  altitude  = document.getElementById("altitude").value || "";
-
-const dryPhaseTime =
-  (dryEnd != null)
-    ? dryEnd
-    : null;
-
-const maillardTime =
-  (dryEnd != null && fc != null)
-    ? (fc - dryEnd)
-    : null;
-    
-    const totalTime = endTime ?? null;
-
-const dryPhaseRate =
-  (dryPhaseTime != null && totalTime)
-    ? (dryPhaseTime / totalTime * 100).toFixed(1)
-    : null;
-
-const maillardRate =
-  (maillardTime != null && totalTime)
-    ? (maillardTime / totalTime * 100).toFixed(1)
-    : null;
-    
-  const devTime =
-    (fc != null && endTime != null)
-      ? (endTime - fc)
-      : null;
-
-  const devRate =
-    (devTime != null && endTime > 0)
-      ? (devTime / endTime * 100).toFixed(1)
-      : null;
-
-  let csv=[
-    "# Roast Logger CSV",
-  "# Date," + roastDate,
-  "# Country," + country,
-  "# Farm," + farm,
-  "# Variety," + variety,
-  "# Process," + process,
-  "# Altitude," + altitude,
-    "# ChargeTemp," + (charge!=null ? startTemp : ""),
-"# TurningPointTemp," + (tpTemp ?? ""),
-"# DryEndTemp," + (dryEndTemp ?? ""),
-"# FirstCrackTemp," + (fcTemp ?? ""),
-"# DropTemp," + (dropTemp ?? ""),
-  "# Charge," +
-    (charge != null ? secToMinSec(charge) : ""),
-
-  "# TurningPoint," +
-    (tp != null ? secToMinSec(tp) : ""),
-
-  "# DryEnd," +
-    (dryEnd != null ? secToMinSec(dryEnd) : ""),
-
-"# StartToDry," +
-  (dryPhaseTime != null ? secToMinSec(dryPhaseTime) : ""),
-
-"# DryToFC," +
-  (maillardTime != null ? secToMinSec(maillardTime) : ""),
-  
-  "# FirstCrack," +
-    (fc != null ? secToMinSec(fc) : ""),
-
-  "# Drop," +
-    (endTime != null ? secToMinSec(endTime) : ""),
-
-  "# DevelopmentTime," +
-    (devTime != null ? secToMinSec(devTime) : ""),
-
-"# StartToDryRate," +
-  (dryPhaseRate != null ? dryPhaseRate + "%" : ""),
-
-"# DryToFCRate," +
-  (maillardRate != null ? maillardRate + "%" : ""),
-  
-  "# DevelopmentRate," +
-  (devRate != null ? devRate + "%" : ""),
-  
-  "time(mm:ss),temperature(C),gas"
-];
-
-  const map={};
-  tempData.forEach(d=>{
-    map[d.x]=map[d.x]||{};
-    map[d.x].t=d.y;
-  });
-  gasData.forEach(d=>{
-    map[d.x]=map[d.x]||{};
-    map[d.x].g=d.y;
-  });
-
-  Object.keys(map).sort((a,b)=>a-b).forEach(t=>{
-    csv.push(
-      `${secToMinSec(Number(t))},${map[t].t??""},${map[t].g??""}`
-    );
-  });
-
-  const blob=new Blob([csv.join("\n")],{type:"text/csv"});
-const a=document.createElement("a");
-a.href=URL.createObjectURL(blob);
-
-const datePart = roastDate || "no_date";
-const countryPart = country || "no_country";
-const farmPart = farm || "no_farm";
-const safe = s => s.replace(/[\\/:*?"<>| ]+/g, "_");
-
-a.download = `${safe(datePart)}_${safe(countryPart)}_${safe(farmPart)}.csv`;
-a.click();
-};
-
-document.getElementById("loadCsv").onchange = e => {
-  const file = e.target.files[0];
-  if(!file) return;
-
-  const reader = new FileReader();
-  reader.onload = ev => {
-    const lines = ev.target.result.split("\n");
-
-    tempData.length = 0;
-    gasData.length = 0;
-
-    
-      lines.forEach(line => {
- // ===== 豆情報（←★ここに追加）=====
-  if(line.startsWith("# Date,")){
-    document.getElementById("roastDate").value = line.split(",")[1] ?? "";
-    return;
-  }
-  if(line.startsWith("# Country,")){
-    document.getElementById("country").value = line.split(",")[1] ?? "";
-    return;
-  }
-  if(line.startsWith("# Farm,")){
-    document.getElementById("farm").value = line.split(",")[1] ?? "";
-    return;
-  }
-  if(line.startsWith("# Variety,")){
-    document.getElementById("variety").value = line.split(",")[1] ?? "";
-    return;
-  }
-  if(line.startsWith("# Process,")){
-    document.getElementById("process").value = line.split(",")[1] ?? "";
-    return;
-  }
-  if(line.startsWith("# Altitude,")){
-    document.getElementById("altitude").value = line.split(",")[1] ?? "";
-    return;
-  }
-
-  // ===== フェーズ情報 =====
-  if(line.startsWith("# Charge,")){
-    charge = minSecToSec(line.split(",")[1]);
-    return;
-  }
-  if(line.startsWith("# TurningPoint,")){
-    tp = minSecToSec(line.split(",")[1]);
-    return;
-  }
-  if(line.startsWith("# DryEnd,")){
-    dryEnd = minSecToSec(line.split(",")[1]);
-    return;
-  }
-  if(line.startsWith("# FirstCrack,")){
-    fc = minSecToSec(line.split(",")[1]);
-    return;
-  }
-  if(line.startsWith("# Drop,")){
-    endTime = minSecToSec(line.split(",")[1]);
-    return;
-  }
-
-  // ===== データ行 =====
-  if(line.startsWith("#") || line.startsWith("time")) return;
-
-  const [t, tempStr, gasStr] = line.split(",");
-  if(!t) return;
-
-  const sec = minSecToSec(t);
-
-  if(tempStr)
-    tempData.push({x:sec, y:Number(tempStr)});
-  if(gasStr)
-    gasData.push({x:sec, y:Number(gasStr)});
-});
-    
-
-  startTime = Date.now();
-
-if(!endTime){
-  endTime = Math.max(
-    ...tempData.map(d=>d.x),
-    ...gasData.map(d=>d.x)
-  );
-}
-
-// スケール調整
-chart.options.scales.x.max = endTime + 10;
-chart.options.scales.x.min = 0;
-
-time.textContent = secToMinSec(endTime);
-
-// ★ input欄から最新の値を取り直す
-roastDate = document.getElementById("roastDate").value || "";
-country   = document.getElementById("country").value || "";
-farm      = document.getElementById("farm").value || "";
-variety   = document.getElementById("variety").value || "";
-process   = document.getElementById("process").value || "";
-altitude  = document.getElementById("altitude").value || "";
-
-// ===== 履歴に保存 =====
-const title =
-  (roastDate || "no_date") + "_" +
-  (country || "no_country") + "_" +
-  (farm || "no_farm");
-
-roastHistory.push({
-  title,
-  tempData: JSON.parse(JSON.stringify(tempData)),
-  gasData: JSON.parse(JSON.stringify(gasData)),
-  charge,
-  tp,
-  dryEnd,
-  fc,
-  endTime,
-  tpTemp,
-  dryEndTemp,
-  fcTemp,
-  dropTemp
-});
-
-// セレクタ更新
-const cmpSel = document.getElementById("compareSelect");
-const cmpOpt = document.createElement("option");
-cmpOpt.value = roastHistory.length - 1;
-cmpOpt.textContent = title;
-cmpSel.appendChild(cmpOpt);
-
-const sel = document.getElementById("historySelect");
-const opt = document.createElement("option");
-opt.value = roastHistory.length - 1;
-opt.textContent = title;
-sel.appendChild(opt);
-
-draw();
-  };
-  reader.readAsText(file);
-};
-
-historySelect.onchange = e => {
-  const idx = e.target.value;
-  if(idx === "") return;
-
-  const h = roastHistory[idx];
-
-
-  tempData.length = 0;
-  gasData.length = 0;
-
-  h.tempData.forEach(d => tempData.push(d));
-  h.gasData.forEach(d => gasData.push(d));
-
-  charge = h.charge;
-  tp = h.tp;
-  dryEnd = h.dryEnd;
-  fc = h.fc;
-  endTime = h.endTime;
-
-  tpTemp = h.tpTemp;
-  dryEndTemp = h.dryEndTemp;
-  fcTemp = h.fcTemp;
-  dropTemp = h.dropTemp;
-
-  startTime = Date.now();
-
-  chart.options.scales.x.max = endTime + 10;
-  time.textContent = secToMinSec(endTime);
-
-  draw();
-};
-compareSelect.onchange = e => {
-  const idx = e.target.value;
-
-  if(idx === ""){
-    compareTempData = [];
-    chart.data.datasets[1].data = [];
-    chart.update();
-    return;
-  }
-
-  const h = roastHistory[idx];
-  
-  comparePhase = calcPhases(
-  h.dryEnd,
-  h.fc,
-  h.endTime
-);
-
-  compareTempData = h.tempData.map(d => ({
-    x: d.x,
-    y: d.y
-  }));
-
-  chart.data.datasets[1].data = compareTempData;
-  chart.update();
-};
 </script>
 </body>
 </html>
-
