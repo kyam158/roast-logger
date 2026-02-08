@@ -48,6 +48,11 @@ input, textarea, select {font-size:16px !important;}
 }
 html{touch-action: manipulation;}
 body{overscroll-behavior: none;}
+
+/* ===== ★ iPhoneだけ下に余白追加 ===== */
+body.iphone #panel{
+  padding-bottom:120px;
+}
 </style>
 </head>
 
@@ -132,7 +137,6 @@ body{overscroll-behavior: none;}
 <input id="variety" placeholder="Variety">
 <input id="process" placeholder="Process">
 <input id="altitude" placeholder="Altitude (m)">
-
 </details>
 
 </div>
@@ -152,7 +156,6 @@ const secToMinSec=fmt;
 /* ===== 状態 ===== */
 let startTime=null,endTime=null,timer=null;
 let temp=150,gas=2.5,startTemp=150;
-let charge=null,tp=null,dryEnd=null,fc=null;
 const tempData=[],gasData=[],rorData=[];
 const nowSec=()=>endTime??Math.floor((Date.now()-startTime)/1000);
 
