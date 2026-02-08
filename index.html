@@ -8,7 +8,7 @@
 
 <title>Roast Logger Pro</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1"></script>
+
 <style>
 body{margin:0;font-family:-apple-system;background:#fafafa}
 #container{min-height:100vh}
@@ -158,7 +158,7 @@ let startTime=null,endTime=null,timer=null;
 let temp=150,gas=2.5,startTemp=150;
 const tempData=[],gasData=[],rorData=[];
 const nowSec=()=>endTime??Math.floor((Date.now()-startTime)/1000);
-let dryTime=null, fcTime=null, dropTime=null;
+
 /* ===== Chart ===== */
 const chart=new Chart(document.getElementById("chart"),{
  type:"line",
@@ -234,59 +234,8 @@ function draw(){
  chart.data.datasets[3].data=gasData;
  chart.update();
  updateLogTable();
-
-// ===== フェーズライン表示 =====
-chart.options.plugins.annotation = {
- annotations: {}
-};
-
-if(dryTime){
- chart.options.plugins.annotation.annotations.dry = {
-  type:"line",
-  xMin:dryTime,
-  xMax:dryTime,
-  borderColor:"orange",
-  borderWidth:2,
-  label:{display:true,content:"Dry End"}
- };
 }
 
-if(fcTime){
- chart.options.plugins.annotation.annotations.fc = {
-  type:"line",
-  xMin:fcTime,
-  xMax:fcTime,
-  borderColor:"red",
-  borderWidth:2,
-  label:{display:true,content:"1st Crack"}
- };
-}
-
-if(dropTime){
- chart.options.plugins.annotation.annotations.drop = {
-  type:"line",
-  xMin:dropTime,
-  xMax:dropTime,
-  borderColor:"black",
-  borderWidth:2,
-  label:{display:true,content:"Drop"}
- };
-}
-
-const p = calcPhases();
-if(p){
- chart.options.plugins.annotation.annotations.phaseText = {
-  type:"label",
-  xValue: dropTime * 0.5,
-  yValue: 200,
-  backgroundColor:"rgba(255,255,255,0.8)",
-  content:[
-   `Dry ${p.dryPct}%`,
-   `Maillard ${p.mailPct}%`,
-   `🔥 Dev ${p.devPct}% (${p.devTime})`
-  ]
- };
-}
 /* ===== 操作 ===== */
 startBtn.onclick=()=>{
  startTemp=parseInt(startTempInput.value)||150;
@@ -323,34 +272,13 @@ let hold=null;
 const holdStart=f=>hold=setTimeout(f,600);
 const holdCancel=()=>clearTimeout(hold);
 
-dryBtn.onpointerdown=e=>{
- e.preventDefault();
- holdStart(()=>{
-  dryTime=nowSec();
-  addEventLog("Dry End");
- });
-};
-
-fcBtn.onpointerdown=e=>{
- e.preventDefault();
- holdStart(()=>{
-  fcTime=nowSec();
-  addEventLog("First Crack");
- });
-};
-
+dryBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>{addEventLog("Dry End");});};
+fcBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>{addEventLog("First Crack");});};
 [dryBtn,fcBtn].forEach(b=>{b.onpointerup=holdCancel;b.onpointercancel=holdCancel;});
 
 chargeBtn.onclick=()=>{addEventLog("Charge");};
 tpBtn.onclick=()=>{addEventLog("Turning Point");};
-
-dropBtn.onclick=()=>{
- dropTime=nowSec();
- endTime=dropTime;
- addEventLog("Drop");
- clearInterval(timer);
- draw();
-};
+dropBtn.onclick=()=>{endTime=nowSec();addEventLog("Drop");clearInterval(timer);draw();};
 
 /* iOSキーボード固定防止 */
 let scrollY=0;
@@ -366,21 +294,6 @@ document.querySelectorAll("input").forEach(el=>{
   window.scrollTo(0,scrollY);
  });
 });
-
-function calcPhases(){
- if(!dryTime||!fcTime||!dropTime)return null;
- const total=dropTime;
- const dry=dryTime;
- const maillard=fcTime-dryTime;
- const dev=dropTime-fcTime;
- return {
-  dryPct:(dry/total*100).toFixed(1),
-  mailPct:(maillard/total*100).toFixed(1),
-  devPct:(dev/total*100).toFixed(1),
-  devTime:secToMinSec(dev)
- };
-}
-
 </script>
 </body>
 </html>
