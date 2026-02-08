@@ -41,27 +41,13 @@ body.ipad button,body.ipad input{font-size:18px;padding:14px}
 #eventTable th,#eventTable td{border:1px solid #444;padding:4px;text-align:center}
 #eventTable thead{position:sticky;top:0;background:#1565c0;color:#fff}
 
-/* ================== */
-/* ★ iPhone Safari zoom 完全防止 */
-/* ================== */
-input, textarea, select {
-  font-size:16px !important;
-}
-
-/* iOS専用保険 */
+/* iPhone zoom防止 */
+input, textarea, select {font-size:16px !important;}
 @supports (-webkit-touch-callout: none) {
-  input, textarea, select {
-    font-size:16px !important;
-  }
+  input, textarea, select {font-size:16px !important;}
 }
-
-/* iOSの謎ズーム・スクロール暴走防止 */
-html {
-  touch-action: manipulation;
-}
-body {
-  overscroll-behavior: none;
-}
+html{touch-action: manipulation;}
+body{overscroll-behavior: none;}
 </style>
 </head>
 
@@ -99,14 +85,6 @@ body {
 <div id="panel">
 <div id="time">0:00</div>
 
-<label>豆情報</label>
-<input id="roastDate" type="date">
-<input id="country" placeholder="Country">
-<input id="farm" placeholder="Farm">
-<input id="variety" placeholder="Variety">
-<input id="process" placeholder="Process">
-<input id="altitude" placeholder="Altitude (m)">
-
 <label>開始温度</label>
 <input id="startTempInput" type="number" value="150">
 <button id="startBtn">焙煎開始</button>
@@ -141,6 +119,22 @@ body {
 <select id="historySelect"><option value="">履歴</option></select>
 <select id="compareSelect"><option value="">比較</option></select>
 
+<!-- ★ 折りたたみ豆情報（最下部） -->
+<hr>
+<details>
+<summary style="font-weight:bold;font-size:16px;">☕ 豆情報（タップで開く）</summary>
+
+<label>焙煎日</label>
+<input id="roastDate" type="date">
+
+<input id="country" placeholder="Country">
+<input id="farm" placeholder="Farm">
+<input id="variety" placeholder="Variety">
+<input id="process" placeholder="Process">
+<input id="altitude" placeholder="Altitude (m)">
+
+</details>
+
 </div>
 </div>
 
@@ -159,7 +153,6 @@ const secToMinSec=fmt;
 let startTime=null,endTime=null,timer=null;
 let temp=150,gas=2.5,startTemp=150;
 let charge=null,tp=null,dryEnd=null,fc=null;
-let tpTemp,dryEndTemp,fcTemp,dropTemp;
 const tempData=[],gasData=[],rorData=[];
 const nowSec=()=>endTime??Math.floor((Date.now()-startTime)/1000);
 
@@ -194,7 +187,7 @@ function calcRoR(){
  }
 }
 
-/* ===== 1分ログ表 ===== */
+/* ===== ログ表 ===== */
 function updateLogTable(){
  const tbody=document.querySelector("#logTable tbody");
  tbody.innerHTML="";
@@ -276,12 +269,12 @@ let hold=null;
 const holdStart=f=>hold=setTimeout(f,600);
 const holdCancel=()=>clearTimeout(hold);
 
-dryBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>{dryEnd=nowSec();addEventLog("Dry End");});};
-fcBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>{fc=nowSec();addEventLog("First Crack");});};
+dryBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>{addEventLog("Dry End");});};
+fcBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>{addEventLog("First Crack");});};
 [dryBtn,fcBtn].forEach(b=>{b.onpointerup=holdCancel;b.onpointercancel=holdCancel;});
 
-chargeBtn.onclick=()=>{charge=nowSec();addEventLog("Charge");};
-tpBtn.onclick=()=>{tp=nowSec();addEventLog("Turning Point");};
+chargeBtn.onclick=()=>{addEventLog("Charge");};
+tpBtn.onclick=()=>{addEventLog("Turning Point");};
 dropBtn.onclick=()=>{endTime=nowSec();addEventLog("Drop");clearInterval(timer);draw();};
 
 /* iOSキーボード固定防止 */
