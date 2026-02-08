@@ -17,7 +17,6 @@ button,input,select{width:100%;padding:12px;margin:6px 0;font-size:16px}
 #dropBtn{background:#d32f2f;color:#fff;font-weight:bold}
 #csvBtn{background:#1976d2;color:#fff}
 #time{text-align:center;font-size:22px;margin:6px 0}
-
 button{touch-action:manipulation}
 
 /* ===== iPad 横並びUI ===== */
@@ -28,10 +27,16 @@ body.ipad{font-size:18px}
 body.ipad button,body.ipad input{font-size:18px;padding:14px}
 
 /* ===== Log Table ===== */
-#logTableWrap{max-height:30vh;overflow-y:auto;background:#fff;border-top:2px solid #000}
+#logTableWrap{max-height:20vh;overflow-y:auto;background:#fff;border-top:2px solid #000}
 #logTable{width:100%;border-collapse:collapse;font-size:12px}
 #logTable th,#logTable td{border:1px solid #444;padding:2px 4px;text-align:center}
 #logTable thead{position:sticky;top:0;background:#000;color:#fff}
+
+/* ===== Event Table ===== */
+#eventTableWrap{max-height:20vh;overflow-y:auto;background:#fff;border-top:2px solid #1565c0}
+#eventTable{width:100%;border-collapse:collapse;font-size:13px}
+#eventTable th,#eventTable td{border:1px solid #444;padding:4px;text-align:center}
+#eventTable thead{position:sticky;top:0;background:#1565c0;color:#fff}
 
 /* iOS zoom防止 */
 input,textarea{font-size:16px}
@@ -44,12 +49,24 @@ input,textarea{font-size:16px}
 <!-- グラフ -->
 <div id="chartWrap"><canvas id="chart"></canvas></div>
 
-<!-- ログ表 -->
+<!-- 1分ログ表 -->
 <div id="logTableWrap">
 <table id="logTable">
 <thead>
 <tr>
 <th>Time</th><th>Temp</th><th>Gas</th><th>Air</th><th>RoR</th><th>Note</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+
+<!-- ★ イベント記録表 -->
+<div id="eventTableWrap">
+<table id="eventTable">
+<thead>
+<tr>
+<th>Event</th><th>Time</th><th>Temp</th><th>Gas</th>
 </tr>
 </thead>
 <tbody></tbody>
@@ -133,7 +150,7 @@ let compareTempData=[],comparePhase=null;
 const nowSec=()=>endTime??Math.floor((Date.now()-startTime)/1000);
 
 /* ===== Chart ===== */
-const chart=new Chart(chartCanvas=document.getElementById("chart"),{
+const chart=new Chart(document.getElementById("chart"),{
  type:"line",
  data:{datasets:[
   {label:"Temp",data:[],borderWidth:2,tension:.3,pointRadius:0},
@@ -152,7 +169,7 @@ const chart=new Chart(chartCanvas=document.getElementById("chart"),{
  }
 });
 
-/* ===== RoR計算 ===== */
+/* ===== RoR ===== */
 function calcRoR(){
  rorData.length=0;
  for(let i=1;i<tempData.length;i++){
@@ -163,7 +180,7 @@ function calcRoR(){
  }
 }
 
-/* ===== ログ表更新（★外に置く） ===== */
+/* ===== 1分ログ表 ===== */
 function updateLogTable(){
  const tbody=document.querySelector("#logTable tbody");
  tbody.innerHTML="";
@@ -181,6 +198,18 @@ function updateLogTable(){
    <td></td>`;
   tbody.appendChild(tr);
  }
+}
+
+/* ===== ★イベント表 ===== */
+function addEventLog(name){
+ const tbody=document.querySelector("#eventTable tbody");
+ const tr=document.createElement("tr");
+ tr.innerHTML=`
+  <td>${name}</td>
+  <td>${secToMinSec(nowSec())}</td>
+  <td>${temp.toFixed(0)}</td>
+  <td>${gas.toFixed(1)}</td>`;
+ tbody.appendChild(tr);
 }
 
 /* ===== 描画 ===== */
@@ -203,6 +232,7 @@ startBtn.onclick=()=>{
  temp=startTemp;
  startTime=Date.now();endTime=null;
  tempData.length=0;gasData.length=0;rorData.length=0;
+ document.querySelector("#eventTable tbody").innerHTML=""; // ★イベント表クリア
  tempData.push({x:0,y:startTemp});
  gasData.push({x:0,y:gas});
  clearInterval(timer);
@@ -221,6 +251,7 @@ const setGas=v=>{
  gasLabel.textContent=gas.toFixed(1);
  gasInput.value=gas.toFixed(1);
  gasData.push({x:nowSec(),y:gas});
+ addEventLog("Gas Change"); // ★追加
  draw();
 };
 gasUp.onpointerdown=e=>{e.preventDefault();setGas(gas+0.1);}
@@ -232,15 +263,15 @@ let hold=null;
 const holdStart=f=>hold=setTimeout(f,600);
 const holdCancel=()=>clearTimeout(hold);
 
-dryBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>{dryEnd=nowSec();dryEndTemp=temp;});};
-fcBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>{fc=nowSec();fcTemp=temp;});};
+dryBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>{dryEnd=nowSec();dryEndTemp=temp;addEventLog("Dry End");});};
+fcBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>{fc=nowSec();fcTemp=temp;addEventLog("First Crack");});};
 [dryBtn,fcBtn].forEach(b=>{b.onpointerup=holdCancel;b.onpointercancel=holdCancel;});
 
-chargeBtn.onclick=()=>{charge=nowSec();};
-tpBtn.onclick=()=>{tp=nowSec();tpTemp=temp;};
-dropBtn.onclick=()=>{endTime=nowSec();dropTemp=temp;clearInterval(timer);draw();};
+chargeBtn.onclick=()=>{charge=nowSec();addEventLog("Charge");};
+tpBtn.onclick=()=>{tp=nowSec();tpTemp=temp;addEventLog("Turning Point");};
+dropBtn.onclick=()=>{endTime=nowSec();dropTemp=temp;addEventLog("Drop");clearInterval(timer);draw();};
 
-/* iOSキーボード画面固定防止 */
+/* iOSキーボード固定防止 */
 let scrollY=0;
 document.querySelectorAll("input").forEach(el=>{
  el.addEventListener("focus",()=>{
