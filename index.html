@@ -236,49 +236,57 @@ function draw(){
  updateLogTable();
 
 // ===== フェーズライン表示 =====
-if(!chart.options.plugins) chart.options.plugins={};
-if(!chart.options.plugins.annotation) chart.options.plugins.annotation={};
-chart.options.plugins.annotation.annotations={};
+chart.options.plugins.annotation = {
+ annotations: {}
+};
 
 if(dryTime){
- chart.options.plugins.annotation.annotations.dry={
-  type:"line",xMin:dryTime,xMax:dryTime,
-  borderColor:"orange",borderWidth:2,
+ chart.options.plugins.annotation.annotations.dry = {
+  type:"line",
+  xMin:dryTime,
+  xMax:dryTime,
+  borderColor:"orange",
+  borderWidth:2,
   label:{display:true,content:"Dry End"}
  };
 }
 
 if(fcTime){
- chart.options.plugins.annotation.annotations.fc={
-  type:"line",xMin:fcTime,xMax:fcTime,
-  borderColor:"red",borderWidth:2,
+ chart.options.plugins.annotation.annotations.fc = {
+  type:"line",
+  xMin:fcTime,
+  xMax:fcTime,
+  borderColor:"red",
+  borderWidth:2,
   label:{display:true,content:"1st Crack"}
  };
 }
 
 if(dropTime){
- chart.options.plugins.annotation.annotations.drop={
-  type:"line",xMin:dropTime,xMax:dropTime,
-  borderColor:"black",borderWidth:2,
+ chart.options.plugins.annotation.annotations.drop = {
+  type:"line",
+  xMin:dropTime,
+  xMax:dropTime,
+  borderColor:"black",
+  borderWidth:2,
   label:{display:true,content:"Drop"}
  };
 }
 
-const p=calcPhases();
+const p = calcPhases();
 if(p){
- chart.options.plugins.annotation.annotations.phaseText={
+ chart.options.plugins.annotation.annotations.phaseText = {
   type:"label",
-  xValue:dropTime*0.3,
-  yValue:240,
-  backgroundColor:"rgba(255,255,255,0.7)",
+  xValue: dropTime * 0.5,
+  yValue: 200,
+  backgroundColor:"rgba(255,255,255,0.8)",
   content:[
    `Dry ${p.dryPct}%`,
    `Maillard ${p.mailPct}%`,
-   `Dev ${p.devPct}% (${p.devTime})`
+   `🔥 Dev ${p.devPct}% (${p.devTime})`
   ]
  };
 }
-
 /* ===== 操作 ===== */
 startBtn.onclick=()=>{
  startTemp=parseInt(startTempInput.value)||150;
