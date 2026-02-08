@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 
-<!-- ★ iPhoneズーム防止（強力） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 
 <title>Roast Logger Pro</title>
@@ -22,37 +21,24 @@ button,input,select{width:100%;padding:12px;margin:6px 0;font-size:16px}
 #time{text-align:center;font-size:22px;margin:6px 0}
 button{touch-action:manipulation}
 
-/* ===== iPad 横並びUI ===== */
+/* iPad */
 body.ipad #container{display:flex;flex-direction:row;height:100vh}
 body.ipad #chartWrap{flex:1.2;height:60vh}
 body.ipad #panel{flex:1;overflow-y:auto;padding-left:10px;background:#fff}
-body.ipad{font-size:18px}
-body.ipad button,body.ipad input{font-size:18px;padding:14px}
 
-/* ===== Log Table ===== */
-#logTableWrap{max-height:20vh;overflow-y:auto;background:#fff;border-top:2px solid #000}
-#logTable{width:100%;border-collapse:collapse;font-size:12px}
-#logTable th,#logTable td{border:1px solid #444;padding:2px 4px;text-align:center}
-#logTable thead{position:sticky;top:0;background:#000;color:#fff}
-
-/* ===== Event Table ===== */
-#eventTableWrap{max-height:20vh;overflow-y:auto;background:#fff;border-top:2px solid #1565c0}
-#eventTable{width:100%;border-collapse:collapse;font-size:13px}
-#eventTable th,#eventTable td{border:1px solid #444;padding:4px;text-align:center}
-#eventTable thead{position:sticky;top:0;background:#1565c0;color:#fff}
+/* tables */
+#logTableWrap,#eventTableWrap{max-height:20vh;overflow-y:auto;background:#fff;border-top:2px solid #000}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{border:1px solid #444;padding:2px;text-align:center}
+thead{position:sticky;top:0;background:#000;color:#fff}
 
 /* iPhone zoom防止 */
 input, textarea, select {font-size:16px !important;}
-@supports (-webkit-touch-callout: none) {
-  input, textarea, select {font-size:16px !important;}
-}
 html{touch-action: manipulation;}
 body{overscroll-behavior: none;}
 
-/* ===== ★ iPhoneだけ下に余白追加 ===== */
-body.iphone #panel{
-  padding-bottom:120px;
-}
+/* iPhone 下余白 */
+body.iphone #panel{padding-bottom:120px;}
 </style>
 </head>
 
@@ -62,24 +48,12 @@ body.iphone #panel{
 <!-- グラフ -->
 <div id="chartWrap"><canvas id="chart"></canvas></div>
 
-<!-- 1分ログ表 -->
-<div id="logTableWrap">
-<table id="logTable">
-<thead>
-<tr>
-<th>Time</th><th>Temp</th><th>Gas</th><th>Air</th><th>RoR</th><th>Note</th>
-</tr>
-</thead>
-<tbody></tbody>
-</table>
-</div>
-
 <!-- イベント表 -->
 <div id="eventTableWrap">
 <table id="eventTable">
 <thead>
 <tr>
-<th>Event</th><th>Time</th><th>Temp</th><th>Gas</th>
+<th>Event</th><th>Time</th><th>Temp</th><th>Gas</th><th>Damper</th>
 </tr>
 </thead>
 <tbody></tbody>
@@ -100,38 +74,41 @@ body.iphone #panel{
 <button id="tempSet">決定</button>
 </div>
 
+<!-- Gas -->
 <label>Gas</label>
 <div class="row">
 <button id="gasDown">−</button>
 <div id="gasLabel" style="text-align:center;font-size:20px;line-height:48px">2.5</div>
 <button id="gasUp">＋</button>
 </div>
-
 <div class="row">
 <input id="gasInput" type="number" step="0.1" value="2.5">
 <button id="gasSet">決定</button>
 </div>
 
+<!-- ★ Damper -->
+<label>Damper (0-8)</label>
+<div class="row">
+<button id="damperDown">−</button>
+<div id="damperLabel" style="text-align:center;font-size:20px;line-height:48px">0</div>
+<button id="damperUp">＋</button>
+</div>
+<div class="row">
+<input id="damperInput" type="number" min="0" max="8" value="0">
+<button id="damperSet">決定</button>
+</div>
+
+<!-- イベント -->
 <button id="chargeBtn">Charge</button>
 <button id="tpBtn">Turning Point</button>
 <button id="dryBtn">Dry End（長押し）</button>
 <button id="fcBtn">1st Crack（長押し）</button>
 <button id="dropBtn">DROP</button>
 
-<button id="csvBtn">CSV Export</button>
-<input id="loadCsv" type="file" accept=".csv">
-
-<select id="historySelect"><option value="">履歴</option></select>
-<select id="compareSelect"><option value="">比較</option></select>
-
-<!-- ★ 折りたたみ豆情報（最下部） -->
 <hr>
 <details>
-<summary style="font-weight:bold;font-size:16px;">☕ 豆情報（タップで開く）</summary>
-
-<label>焙煎日</label>
+<summary>☕ 豆情報</summary>
 <input id="roastDate" type="date">
-
 <input id="country" placeholder="Country">
 <input id="farm" placeholder="Farm">
 <input id="variety" placeholder="Variety">
@@ -143,157 +120,92 @@ body.iphone #panel{
 </div>
 
 <script>
-/* ===== Device判定 ===== */
-const isIPad =
- navigator.userAgent.includes("iPad") ||
- (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
+/* device */
+const isIPad = navigator.userAgent.includes("iPad") || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
 document.body.classList.add(isIPad?"ipad":"iphone");
 
-/* ===== util ===== */
+/* util */
 const fmt=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
-const secToMinSec=fmt;
-
-/* ===== 状態 ===== */
-let startTime=null,endTime=null,timer=null;
-let temp=150,gas=2.5,startTemp=150;
-const tempData=[],gasData=[],rorData=[];
 const nowSec=()=>endTime??Math.floor((Date.now()-startTime)/1000);
 
-/* ===== Chart ===== */
-const chart=new Chart(document.getElementById("chart"),{
+/* state */
+let startTime=null,endTime=null,timer=null;
+let temp=150,gas=2.5,damper=0;
+const tempData=[],gasData=[];
+
+/* Chart */
+const chart=new Chart(chartWrap.firstElementChild,{
  type:"line",
- data:{datasets:[
-  {label:"Temp",data:[],borderWidth:2,tension:.3,pointRadius:0},
-  {label:"Compare",data:[],borderDash:[6,4],borderColor:"#999",pointRadius:0},
-  {label:"RoR",data:[],yAxisID:"yRoR",borderWidth:2,tension:.3,pointRadius:0},
-  {label:"Gas",data:[],yAxisID:"yR",borderDash:[4,4]}
- ]},
- options:{
-  animation:false,
-  scales:{
-   x:{type:"linear",min:0,ticks:{stepSize:60,callback:v=>`${Math.floor(v/60)}:00`}},
-   y:{min:0,max:260,ticks:{stepSize:20}},
-   yR:{position:"right",min:0,max:5,grid:{drawOnChartArea:false}},
-   yRoR:{position:"right",min:0,max:40,offset:true,grid:{drawOnChartArea:false}}
-  }
- }
+ data:{datasets:[{label:"Temp",data:[]},{label:"Gas",data:[]}]},
+ options:{animation:false,scales:{x:{type:"linear"}}}
 });
 
-/* ===== RoR ===== */
-function calcRoR(){
- rorData.length=0;
- for(let i=1;i<tempData.length;i++){
-  const p=tempData[i-1],c=tempData[i];
-  const dt=c.x-p.x;if(dt<=0)continue;
-  const r=(c.y-p.y)*(60/dt);
-  rorData.push({x:c.x,y:+r.toFixed(1)});
- }
-}
-
-/* ===== ログ表 ===== */
-function updateLogTable(){
- const tbody=document.querySelector("#logTable tbody");
- tbody.innerHTML="";
- for(let sec=0;sec<=nowSec();sec+=60){
-  const t=[...tempData].reverse().find(d=>d.x<=sec);
-  const g=[...gasData].reverse().find(d=>d.x<=sec);
-  const r=[...rorData].reverse().find(d=>d.x<=sec);
-  const tr=document.createElement("tr");
-  tr.innerHTML=`
-   <td>${secToMinSec(sec)}</td>
-   <td>${t?t.y.toFixed(0):""}</td>
-   <td>${g?g.y.toFixed(1):""}</td>
-   <td></td>
-   <td>${r?r.y.toFixed(1):""}</td>
-   <td></td>`;
-  tbody.appendChild(tr);
- }
-}
-
-/* ===== イベント表 ===== */
+/* event log */
 function addEventLog(name){
- const tbody=document.querySelector("#eventTable tbody");
  const tr=document.createElement("tr");
  tr.innerHTML=`
-  <td>${name}</td>
-  <td>${secToMinSec(nowSec())}</td>
-  <td>${temp.toFixed(0)}</td>
-  <td>${gas.toFixed(1)}</td>`;
- tbody.appendChild(tr);
+ <td>${name}</td>
+ <td>${fmt(nowSec())}</td>
+ <td>${temp}</td>
+ <td>${gas}</td>
+ <td>${damper}</td>`;
+ eventTable.querySelector("tbody").appendChild(tr);
 }
 
-/* ===== 描画 ===== */
+/* draw */
 function draw(){
  if(!startTime)return;
- const t=nowSec();
- time.textContent=fmt(t);
- chart.options.scales.x.max=Math.max(600,t+10);
- calcRoR();
+ time.textContent=fmt(nowSec());
  chart.data.datasets[0].data=tempData;
- chart.data.datasets[2].data=rorData;
- chart.data.datasets[3].data=gasData;
+ chart.data.datasets[1].data=gasData;
  chart.update();
- updateLogTable();
 }
 
-/* ===== 操作 ===== */
+/* start */
 startBtn.onclick=()=>{
- startTemp=parseInt(startTempInput.value)||150;
- temp=startTemp;
  startTime=Date.now();endTime=null;
- tempData.length=0;gasData.length=0;rorData.length=0;
- document.querySelector("#eventTable tbody").innerHTML="";
- tempData.push({x:0,y:startTemp});
+ tempData.length=0;gasData.length=0;
+ eventTable.querySelector("tbody").innerHTML="";
+ tempData.push({x:0,y:temp});
  gasData.push({x:0,y:gas});
- clearInterval(timer);
  timer=setInterval(draw,1000);
- draw();
 };
 
+/* temp */
 tempSet.onclick=()=>{
- temp=parseInt(tempInput.value)||temp;
+ temp=parseInt(tempInput.value);
  tempData.push({x:nowSec(),y:temp});
- draw();
 };
 
-const setGas=v=>{
- gas=Math.min(5,Math.max(0,Number(v.toFixed(1))));
- gasLabel.textContent=gas.toFixed(1);
- gasInput.value=gas.toFixed(1);
+/* gas */
+function setGas(v){
+ gas=Math.max(0,Math.min(5,Number(v.toFixed(1))));
+ gasLabel.textContent=gas;
+ gasInput.value=gas;
  gasData.push({x:nowSec(),y:gas});
  addEventLog("Gas Change");
- draw();
-};
-gasUp.onpointerdown=e=>{e.preventDefault();setGas(gas+0.1);}
-gasDown.onpointerdown=e=>{e.preventDefault();setGas(gas-0.1);}
+}
+gasUp.onclick=()=>setGas(gas+0.1);
+gasDown.onclick=()=>setGas(gas-0.1);
 gasSet.onclick=()=>setGas(parseFloat(gasInput.value));
 
-let hold=null;
-const holdStart=f=>hold=setTimeout(f,600);
-const holdCancel=()=>clearTimeout(hold);
+/* ★ damper */
+function setDamper(v){
+ damper=Math.max(0,Math.min(8,Math.round(v)));
+ damperLabel.textContent=damper;
+ damperInput.value=damper;
+ addEventLog("Damper Change");
+}
+damperUp.onclick=()=>setDamper(damper+1);
+damperDown.onclick=()=>setDamper(damper-1);
+damperSet.onclick=()=>setDamper(parseInt(damperInput.value));
 
-dryBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>{addEventLog("Dry End");});};
-fcBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>{addEventLog("First Crack");});};
-[dryBtn,fcBtn].forEach(b=>{b.onpointerup=holdCancel;b.onpointercancel=holdCancel;});
-
-chargeBtn.onclick=()=>{addEventLog("Charge");};
-tpBtn.onclick=()=>{addEventLog("Turning Point");};
-dropBtn.onclick=()=>{endTime=nowSec();addEventLog("Drop");clearInterval(timer);draw();};
-
-/* iOSキーボード固定防止 */
-let scrollY=0;
-document.querySelectorAll("input").forEach(el=>{
- el.addEventListener("focus",()=>{
-  scrollY=window.scrollY;
-  document.body.style.position="fixed";
-  document.body.style.top=`-${scrollY}px`;
- });
- el.addEventListener("blur",()=>{
-  document.body.style.position="";
-  document.body.style.top="";
-  window.scrollTo(0,scrollY);
- });
-});
+/* events */
+chargeBtn.onclick=()=>addEventLog("Charge");
+tpBtn.onclick=()=>addEventLog("Turning Point");
+dryBtn.onclick=()=>addEventLog("Dry End");
+fcBtn.onclick=()=>addEventLog("First Crack");
+dropBtn.onclick=()=>{endTime=nowSec();addEventLog("Drop");clearInterval(timer);};
 </script>
 </body>
 </html>
