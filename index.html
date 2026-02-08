@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 
+<!-- ★ iPhoneズーム防止（強力） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 
 <title>Roast Logger Pro</title>
@@ -21,191 +22,15 @@ button,input,select{width:100%;padding:12px;margin:6px 0;font-size:16px}
 #time{text-align:center;font-size:22px;margin:6px 0}
 button{touch-action:manipulation}
 
-/* iPad */
+/* ===== iPad 横並びUI ===== */
 body.ipad #container{display:flex;flex-direction:row;height:100vh}
 body.ipad #chartWrap{flex:1.2;height:60vh}
 body.ipad #panel{flex:1;overflow-y:auto;padding-left:10px;background:#fff}
+body.ipad{font-size:18px}
+body.ipad button,body.ipad input{font-size:18px;padding:14px}
 
-/* tables */
-#logTableWrap,#eventTableWrap{max-height:20vh;overflow-y:auto;background:#fff;border-top:2px solid #000}
-table{width:100%;border-collapse:collapse;font-size:12px}
-th,td{border:1px solid #444;padding:2px;text-align:center}
-thead{position:sticky;top:0;background:#000;color:#fff}
-
-/* iPhone zoom防止 */
-input, textarea, select {font-size:16px !important;}
-html{touch-action: manipulation;}
-body{overscroll-behavior: none;}
-
-/* iPhone 下余白 */
-body.iphone #panel{padding-bottom:120px;}
-</style>
-</head>
-
-<body>
-<div id="container">
-
-<!-- グラフ -->
-<div id="chartWrap"><canvas id="chart"></canvas></div>
-
-<!-- イベント表 -->
-<div id="eventTableWrap">
-<table id="eventTable">
-<thead>
-<tr>
-<th>Event</th><th>Time</th><th>Temp</th><th>Gas</th><th>Damper</th>
-</tr>
-</thead>
-<tbody></tbody>
-</table>
-</div>
-
-<!-- 操作パネル -->
-<div id="panel">
-<div id="time">0:00</div>
-
-<label>開始温度</label>
-<input id="startTempInput" type="number" value="150">
-<button id="startBtn">焙煎開始</button>
-
-<label>豆温</label>
-<div class="row">
-<input id="tempInput" type="number" value="150">
-<button id="tempSet">決定</button>
-</div>
-
-<!-- Gas -->
-<label>Gas</label>
-<div class="row">
-<button id="gasDown">−</button>
-<div id="gasLabel" style="text-align:center;font-size:20px;line-height:48px">2.5</div>
-<button id="gasUp">＋</button>
-</div>
-<div class="row">
-<input id="gasInput" type="number" step="0.1" value="2.5">
-<button id="gasSet">決定</button>
-</div>
-
-<!-- ★ Damper -->
-<label>Damper (0-8)</label>
-<div class="row">
-<button id="damperDown">−</button>
-<div id="damperLabel" style="text-align:center;font-size:20px;line-height:48px">0</div>
-<button id="damperUp">＋</button>
-</div>
-<div class="row">
-<input id="damperInput" type="number" min="0" max="8" value="0">
-<button id="damperSet">決定</button>
-</div>
-
-<!-- イベント -->
-<button id="chargeBtn">Charge</button>
-<button id="tpBtn">Turning Point</button>
-<button id="dryBtn">Dry End（長押し）</button>
-<button id="fcBtn">1st Crack（長押し）</button>
-<button id="dropBtn">DROP</button>
-
-<hr>
-<details>
-<summary>☕ 豆情報</summary>
-<input id="roastDate" type="date">
-<input id="country" placeholder="Country">
-<input id="farm" placeholder="Farm">
-<input id="variety" placeholder="Variety">
-<input id="process" placeholder="Process">
-<input id="altitude" placeholder="Altitude (m)">
-</details>
-
-</div>
-</div>
-
-<script>
-/* device */
-const isIPad = navigator.userAgent.includes("iPad") || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
-document.body.classList.add(isIPad?"ipad":"iphone");
-
-/* util */
-const fmt=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
-const nowSec=()=>endTime??Math.floor((Date.now()-startTime)/1000);
-
-/* state */
-let startTime=null,endTime=null,timer=null;
-let temp=150,gas=2.5,damper=0;
-const tempData=[],gasData=[];
-
-/* Chart */
-const chart=new Chart(chartWrap.firstElementChild,{
- type:"line",
- data:{datasets:[{label:"Temp",data:[]},{label:"Gas",data:[]}]},
- options:{animation:false,scales:{x:{type:"linear"}}}
-});
-
-/* event log */
-function addEventLog(name){
- const tr=document.createElement("tr");
- tr.innerHTML=`
- <td>${name}</td>
- <td>${fmt(nowSec())}</td>
- <td>${temp}</td>
- <td>${gas}</td>
- <td>${damper}</td>`;
- eventTable.querySelector("tbody").appendChild(tr);
-}
-
-/* draw */
-function draw(){
- if(!startTime)return;
- time.textContent=fmt(nowSec());
- chart.data.datasets[0].data=tempData;
- chart.data.datasets[1].data=gasData;
- chart.update();
-}
-
-/* start */
-startBtn.onclick=()=>{
- startTime=Date.now();endTime=null;
- tempData.length=0;gasData.length=0;
- eventTable.querySelector("tbody").innerHTML="";
- tempData.push({x:0,y:temp});
- gasData.push({x:0,y:gas});
- timer=setInterval(draw,1000);
-};
-
-/* temp */
-tempSet.onclick=()=>{
- temp=parseInt(tempInput.value);
- tempData.push({x:nowSec(),y:temp});
-};
-
-/* gas */
-function setGas(v){
- gas=Math.max(0,Math.min(5,Number(v.toFixed(1))));
- gasLabel.textContent=gas;
- gasInput.value=gas;
- gasData.push({x:nowSec(),y:gas});
- addEventLog("Gas Change");
-}
-gasUp.onclick=()=>setGas(gas+0.1);
-gasDown.onclick=()=>setGas(gas-0.1);
-gasSet.onclick=()=>setGas(parseFloat(gasInput.value));
-
-/* ★ damper */
-function setDamper(v){
- damper=Math.max(0,Math.min(8,Math.round(v)));
- damperLabel.textContent=damper;
- damperInput.value=damper;
- addEventLog("Damper Change");
-}
-damperUp.onclick=()=>setDamper(damper+1);
-damperDown.onclick=()=>setDamper(damper-1);
-damperSet.onclick=()=>setDamper(parseInt(damperInput.value));
-
-/* events */
-chargeBtn.onclick=()=>addEventLog("Charge");
-tpBtn.onclick=()=>addEventLog("Turning Point");
-dryBtn.onclick=()=>addEventLog("Dry End");
-fcBtn.onclick=()=>addEventLog("First Crack");
-dropBtn.onclick=()=>{endTime=nowSec();addEventLog("Drop");clearInterval(timer);};
-</script>
-</body>
-</html>
+/* ===== Log Table ===== */
+#logTableWrap{max-height:20vh;overflow-y:auto;background:#fff;border-top:2px solid #000}
+#logTable{width:100%;border-collapse:collapse;font-size:12px}
+#logTable th,#logTable td{border:1px solid #444;padding:2px 4px;text-align:center}
+#logTable thead{position:sticky;top:0;background:#000;color:#fff}
