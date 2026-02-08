@@ -2,7 +2,10 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- ★ iPhoneズーム防止（強力） -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+
 <title>Roast Logger Pro</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
@@ -38,8 +41,27 @@ body.ipad button,body.ipad input{font-size:18px;padding:14px}
 #eventTable th,#eventTable td{border:1px solid #444;padding:4px;text-align:center}
 #eventTable thead{position:sticky;top:0;background:#1565c0;color:#fff}
 
-/* iOS zoom防止 */
-input,textarea{font-size:16px}
+/* ================== */
+/* ★ iPhone Safari zoom 完全防止 */
+/* ================== */
+input, textarea, select {
+  font-size:16px !important;
+}
+
+/* iOS専用保険 */
+@supports (-webkit-touch-callout: none) {
+  input, textarea, select {
+    font-size:16px !important;
+  }
+}
+
+/* iOSの謎ズーム・スクロール暴走防止 */
+html {
+  touch-action: manipulation;
+}
+body {
+  overscroll-behavior: none;
+}
 </style>
 </head>
 
@@ -61,7 +83,7 @@ input,textarea{font-size:16px}
 </table>
 </div>
 
-<!-- ★ イベント記録表 -->
+<!-- イベント表 -->
 <div id="eventTableWrap">
 <table id="eventTable">
 <thead>
@@ -132,11 +154,6 @@ document.body.classList.add(isIPad?"ipad":"iphone");
 /* ===== util ===== */
 const fmt=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
 const secToMinSec=fmt;
-const minSecToSec=str=>{
- if(!str)return null;
- const [m,s]=str.split(":").map(Number);
- return m*60+s;
-};
 
 /* ===== 状態 ===== */
 let startTime=null,endTime=null,timer=null;
@@ -144,9 +161,6 @@ let temp=150,gas=2.5,startTemp=150;
 let charge=null,tp=null,dryEnd=null,fc=null;
 let tpTemp,dryEndTemp,fcTemp,dropTemp;
 const tempData=[],gasData=[],rorData=[];
-const roastHistory=[];
-let compareTempData=[],comparePhase=null;
-
 const nowSec=()=>endTime??Math.floor((Date.now()-startTime)/1000);
 
 /* ===== Chart ===== */
@@ -200,7 +214,7 @@ function updateLogTable(){
  }
 }
 
-/* ===== ★イベント表 ===== */
+/* ===== イベント表 ===== */
 function addEventLog(name){
  const tbody=document.querySelector("#eventTable tbody");
  const tr=document.createElement("tr");
@@ -232,7 +246,7 @@ startBtn.onclick=()=>{
  temp=startTemp;
  startTime=Date.now();endTime=null;
  tempData.length=0;gasData.length=0;rorData.length=0;
- document.querySelector("#eventTable tbody").innerHTML=""; // ★イベント表クリア
+ document.querySelector("#eventTable tbody").innerHTML="";
  tempData.push({x:0,y:startTemp});
  gasData.push({x:0,y:gas});
  clearInterval(timer);
@@ -251,25 +265,24 @@ const setGas=v=>{
  gasLabel.textContent=gas.toFixed(1);
  gasInput.value=gas.toFixed(1);
  gasData.push({x:nowSec(),y:gas});
- addEventLog("Gas Change"); // ★追加
+ addEventLog("Gas Change");
  draw();
 };
 gasUp.onpointerdown=e=>{e.preventDefault();setGas(gas+0.1);}
 gasDown.onpointerdown=e=>{e.preventDefault();setGas(gas-0.1);}
 gasSet.onclick=()=>setGas(parseFloat(gasInput.value));
 
-/* 長押し */
 let hold=null;
 const holdStart=f=>hold=setTimeout(f,600);
 const holdCancel=()=>clearTimeout(hold);
 
-dryBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>{dryEnd=nowSec();dryEndTemp=temp;addEventLog("Dry End");});};
-fcBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>{fc=nowSec();fcTemp=temp;addEventLog("First Crack");});};
+dryBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>{dryEnd=nowSec();addEventLog("Dry End");});};
+fcBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>{fc=nowSec();addEventLog("First Crack");});};
 [dryBtn,fcBtn].forEach(b=>{b.onpointerup=holdCancel;b.onpointercancel=holdCancel;});
 
 chargeBtn.onclick=()=>{charge=nowSec();addEventLog("Charge");};
-tpBtn.onclick=()=>{tp=nowSec();tpTemp=temp;addEventLog("Turning Point");};
-dropBtn.onclick=()=>{endTime=nowSec();dropTemp=temp;addEventLog("Drop");clearInterval(timer);draw();};
+tpBtn.onclick=()=>{tp=nowSec();addEventLog("Turning Point");};
+dropBtn.onclick=()=>{endTime=nowSec();addEventLog("Drop");clearInterval(timer);draw();};
 
 /* iOSキーボード固定防止 */
 let scrollY=0;
