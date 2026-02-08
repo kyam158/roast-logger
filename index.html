@@ -2,7 +2,10 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+
+<!-- ★ iPhoneズーム防止（強力） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+
 <title>Roast Logger Pro</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
@@ -10,10 +13,7 @@
 body{margin:0;font-family:-apple-system;background:#fafafa}
 #container{min-height:100vh}
 
-/* chart */
 #chartWrap{height:45vh}
-
-/* input ui */
 button,input,select{width:100%;padding:12px;margin:6px 0;font-size:16px}
 .row{display:flex;gap:6px}
 .row>*{flex:1}
@@ -41,27 +41,28 @@ body.ipad button,body.ipad input{font-size:18px;padding:14px}
 #eventTable th,#eventTable td{border:1px solid #444;padding:4px;text-align:center}
 #eventTable thead{position:sticky;top:0;background:#1565c0;color:#fff}
 
-/* Air buttons */
-#airButtons button{padding:10px;font-size:14px;background:#eee;border:1px solid #666}
-#airButtons button.active{background:#1565c0;color:#fff;font-weight:bold}
-
 /* iPhone zoom防止 */
 input, textarea, select {font-size:16px !important;}
+@supports (-webkit-touch-callout: none) {
+  input, textarea, select {font-size:16px !important;}
+}
 html{touch-action: manipulation;}
 body{overscroll-behavior: none;}
 
-/* iPhone bottom space */
-body.iphone #panel{padding-bottom:120px;}
+/* ===== ★ iPhoneだけ下に余白追加 ===== */
+body.iphone #panel{
+  padding-bottom:120px;
+}
 </style>
 </head>
 
 <body>
 <div id="container">
 
-<!-- Chart -->
+<!-- グラフ -->
 <div id="chartWrap"><canvas id="chart"></canvas></div>
 
-<!-- Log Table -->
+<!-- 1分ログ表 -->
 <div id="logTableWrap">
 <table id="logTable">
 <thead>
@@ -73,19 +74,19 @@ body.iphone #panel{padding-bottom:120px;}
 </table>
 </div>
 
-<!-- Event Table -->
+<!-- イベント表 -->
 <div id="eventTableWrap">
 <table id="eventTable">
 <thead>
 <tr>
-<th>Event</th><th>Time</th><th>Temp</th><th>Gas</th><th>Air</th>
+<th>Event</th><th>Time</th><th>Temp</th><th>Gas</th>
 </tr>
 </thead>
 <tbody></tbody>
 </table>
 </div>
 
-<!-- Panel -->
+<!-- 操作パネル -->
 <div id="panel">
 <div id="time">0:00</div>
 
@@ -105,18 +106,11 @@ body.iphone #panel{padding-bottom:120px;}
 <div id="gasLabel" style="text-align:center;font-size:20px;line-height:48px">2.5</div>
 <button id="gasUp">＋</button>
 </div>
+
 <div class="row">
 <input id="gasInput" type="number" step="0.1" value="2.5">
 <button id="gasSet">決定</button>
 </div>
-
-<!-- Airflow -->
-<label>Airflow (Damper)</label>
-<div class="row" id="airButtons">
-<button>0</button><button>1</button><button>2</button><button>3</button><button>4</button>
-<button>5</button><button>6</button><button>7</button><button>8</button>
-</div>
-<div id="airLabel" style="text-align:center;font-size:20px;margin:6px 0;">Air: 0</div>
 
 <button id="chargeBtn">Charge</button>
 <button id="tpBtn">Turning Point</button>
@@ -125,13 +119,19 @@ body.iphone #panel{padding-bottom:120px;}
 <button id="dropBtn">DROP</button>
 
 <button id="csvBtn">CSV Export</button>
+<input id="loadCsv" type="file" accept=".csv">
 
-<!-- Bean Info bottom -->
+<select id="historySelect"><option value="">履歴</option></select>
+<select id="compareSelect"><option value="">比較</option></select>
+
+<!-- ★ 折りたたみ豆情報（最下部） -->
 <hr>
 <details>
 <summary style="font-weight:bold;font-size:16px;">☕ 豆情報（タップで開く）</summary>
+
 <label>焙煎日</label>
 <input id="roastDate" type="date">
+
 <input id="country" placeholder="Country">
 <input id="farm" placeholder="Farm">
 <input id="variety" placeholder="Variety">
@@ -143,42 +143,43 @@ body.iphone #panel{padding-bottom:120px;}
 </div>
 
 <script>
-/* Device detect */
+/* ===== Device判定 ===== */
 const isIPad =
  navigator.userAgent.includes("iPad") ||
  (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
 document.body.classList.add(isIPad?"ipad":"iphone");
 
-/* util */
+/* ===== util ===== */
 const fmt=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
+const secToMinSec=fmt;
 
-/* state */
+/* ===== 状態 ===== */
 let startTime=null,endTime=null,timer=null;
-let temp=150,gas=2.5,air=0,startTemp=150;
-const tempData=[],gasData=[],airData=[],rorData=[];
+let temp=150,gas=2.5,startTemp=150;
+const tempData=[],gasData=[],rorData=[];
 const nowSec=()=>endTime??Math.floor((Date.now()-startTime)/1000);
 
-/* Chart */
+/* ===== Chart ===== */
 const chart=new Chart(document.getElementById("chart"),{
  type:"line",
  data:{datasets:[
   {label:"Temp",data:[],borderWidth:2,tension:.3,pointRadius:0},
+  {label:"Compare",data:[],borderDash:[6,4],borderColor:"#999",pointRadius:0},
   {label:"RoR",data:[],yAxisID:"yRoR",borderWidth:2,tension:.3,pointRadius:0},
-  {label:"Gas",data:[],yAxisID:"yR",borderDash:[4,4]},
-  {label:"Air",data:[],yAxisID:"yR",borderDash:[2,2]}
+  {label:"Gas",data:[],yAxisID:"yR",borderDash:[4,4]}
  ]},
  options:{
   animation:false,
   scales:{
    x:{type:"linear",min:0,ticks:{stepSize:60,callback:v=>`${Math.floor(v/60)}:00`}},
    y:{min:0,max:260,ticks:{stepSize:20}},
-   yR:{position:"right",min:0,max:8,grid:{drawOnChartArea:false}},
+   yR:{position:"right",min:0,max:5,grid:{drawOnChartArea:false}},
    yRoR:{position:"right",min:0,max:40,offset:true,grid:{drawOnChartArea:false}}
   }
  }
 });
 
-/* RoR */
+/* ===== RoR ===== */
 function calcRoR(){
  rorData.length=0;
  for(let i=1;i<tempData.length;i++){
@@ -189,40 +190,39 @@ function calcRoR(){
  }
 }
 
-/* tables */
+/* ===== ログ表 ===== */
 function updateLogTable(){
  const tbody=document.querySelector("#logTable tbody");
  tbody.innerHTML="";
  for(let sec=0;sec<=nowSec();sec+=60){
   const t=[...tempData].reverse().find(d=>d.x<=sec);
   const g=[...gasData].reverse().find(d=>d.x<=sec);
-  const a=[...airData].reverse().find(d=>d.x<=sec);
   const r=[...rorData].reverse().find(d=>d.x<=sec);
   const tr=document.createElement("tr");
   tr.innerHTML=`
-   <td>${fmt(sec)}</td>
+   <td>${secToMinSec(sec)}</td>
    <td>${t?t.y.toFixed(0):""}</td>
    <td>${g?g.y.toFixed(1):""}</td>
-   <td>${a?a.y:""}</td>
+   <td></td>
    <td>${r?r.y.toFixed(1):""}</td>
    <td></td>`;
   tbody.appendChild(tr);
  }
 }
 
+/* ===== イベント表 ===== */
 function addEventLog(name){
  const tbody=document.querySelector("#eventTable tbody");
  const tr=document.createElement("tr");
  tr.innerHTML=`
   <td>${name}</td>
-  <td>${fmt(nowSec())}</td>
+  <td>${secToMinSec(nowSec())}</td>
   <td>${temp.toFixed(0)}</td>
-  <td>${gas.toFixed(1)}</td>
-  <td>${air}</td>`;
+  <td>${gas.toFixed(1)}</td>`;
  tbody.appendChild(tr);
 }
 
-/* draw */
+/* ===== 描画 ===== */
 function draw(){
  if(!startTime)return;
  const t=nowSec();
@@ -230,23 +230,21 @@ function draw(){
  chart.options.scales.x.max=Math.max(600,t+10);
  calcRoR();
  chart.data.datasets[0].data=tempData;
- chart.data.datasets[1].data=rorData;
- chart.data.datasets[2].data=gasData;
- chart.data.datasets[3].data=airData;
+ chart.data.datasets[2].data=rorData;
+ chart.data.datasets[3].data=gasData;
  chart.update();
  updateLogTable();
 }
 
-/* controls */
+/* ===== 操作 ===== */
 startBtn.onclick=()=>{
  startTemp=parseInt(startTempInput.value)||150;
  temp=startTemp;
  startTime=Date.now();endTime=null;
- tempData.length=gasData.length=airData.length=rorData.length=0;
+ tempData.length=0;gasData.length=0;rorData.length=0;
  document.querySelector("#eventTable tbody").innerHTML="";
  tempData.push({x:0,y:startTemp});
  gasData.push({x:0,y:gas});
- airData.push({x:0,y:air});
  clearInterval(timer);
  timer=setInterval(draw,1000);
  draw();
@@ -270,32 +268,19 @@ gasUp.onpointerdown=e=>{e.preventDefault();setGas(gas+0.1);}
 gasDown.onpointerdown=e=>{e.preventDefault();setGas(gas-0.1);}
 gasSet.onclick=()=>setGas(parseFloat(gasInput.value));
 
-/* Airflow buttons */
-document.querySelectorAll("#airButtons button").forEach(btn=>{
- btn.onclick=()=>{
-  air=parseInt(btn.textContent);
-  airData.push({x:nowSec(),y:air});
-  airLabel.textContent="Air: "+air;
-  document.querySelectorAll("#airButtons button").forEach(b=>b.classList.remove("active"));
-  btn.classList.add("active");
-  addEventLog("Airflow "+air);
-  draw();
- };
-});
-
-/* long press */
 let hold=null;
 const holdStart=f=>hold=setTimeout(f,600);
 const holdCancel=()=>clearTimeout(hold);
-dryBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>addEventLog("Dry End"));};
-fcBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>addEventLog("First Crack"));};
+
+dryBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>{addEventLog("Dry End");});};
+fcBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>{addEventLog("First Crack");});};
 [dryBtn,fcBtn].forEach(b=>{b.onpointerup=holdCancel;b.onpointercancel=holdCancel;});
 
-chargeBtn.onclick=()=>addEventLog("Charge");
-tpBtn.onclick=()=>addEventLog("Turning Point");
+chargeBtn.onclick=()=>{addEventLog("Charge");};
+tpBtn.onclick=()=>{addEventLog("Turning Point");};
 dropBtn.onclick=()=>{endTime=nowSec();addEventLog("Drop");clearInterval(timer);draw();};
 
-/* iOS keyboard jump fix */
+/* iOSキーボード固定防止 */
 let scrollY=0;
 document.querySelectorAll("input").forEach(el=>{
  el.addEventListener("focus",()=>{
