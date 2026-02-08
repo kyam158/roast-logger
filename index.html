@@ -87,6 +87,31 @@ body {
   position: relative;
 }
 
+#logTableWrap{
+  max-height: 30vh;
+  overflow-y: auto;
+  background:#fff;
+  border-top:2px solid #000;
+}
+
+#logTable{
+  width:100%;
+  border-collapse:collapse;
+  font-size:12px;
+}
+
+#logTable th,#logTable td{
+  border:1px solid #444;
+  padding:2px 4px;
+  text-align:center;
+}
+
+#logTable thead{
+  position:sticky;
+  top:0;
+  background:#000;
+  color:#fff;
+}
 
 </style>
 </head>
@@ -538,6 +563,31 @@ function calcRoR(){
       y: +ror.toFixed(1)
     });
   }
+  }
+  function updateLogTable(){
+  const tbody = document.querySelector("#logTable tbody");
+  tbody.innerHTML = "";
+
+  // 1分刻み表示
+  for(let sec = 0; sec <= nowSec(); sec += 60){
+
+    const tempPoint = [...tempData].reverse().find(d=>d.x<=sec);
+    const gasPoint  = [...gasData].reverse().find(d=>d.x<=sec);
+    const rorPoint  = [...rorData].reverse().find(d=>d.x<=sec);
+
+    const tr = document.createElement("tr");
+
+    tr.innerHTML = `
+      <td>${secToMinSec(sec)}</td>
+      <td>${tempPoint ? tempPoint.y.toFixed(0) : ""}</td>
+      <td>${gasPoint ? gasPoint.y.toFixed(1) : ""}</td>
+      <td></td>
+      <td>${rorPoint ? rorPoint.y.toFixed(1) : ""}</td>
+      <td></td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
 }
   /* =====================
    描画
@@ -556,6 +606,9 @@ function draw(){
   chart.data.datasets[3].data = gasData;
   chart.data.datasets[2].data = rorData; // ★ 追加
   chart.update();
+  
+  updateLogTable(); // ★★★ ここに追加
+
 }
 /* =====================
    操作
