@@ -306,19 +306,7 @@ if(ratio){
 } else {
   phaseDiv.innerHTML = "";
 }
-const ratio = calcPhaseRatio();
-const phaseDiv = document.getElementById("phaseText");
 
-if(ratio){
-  phaseDiv.innerHTML = `
-  Drying ${ratio.drying}% (${ratio.dryingTime}) ｜ 
-  Maillard ${ratio.maillard}% (${ratio.maillardTime}) ｜ 
-  Dev ${ratio.dev}% (${ratio.devTime})<br>
-  <span style="font-size:14px;color:#555;">Total ${ratio.totalTime}</span>
-  `;
-} else {
-  phaseDiv.innerHTML = "";
-}
 chart.update();
 }
 
