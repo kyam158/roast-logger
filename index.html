@@ -53,6 +53,17 @@ body{overscroll-behavior: none;}
 body.iphone #panel{
   padding-bottom:120px;
 }
+#phaseText{
+  text-align:center;
+  font-size:22px;
+  font-weight:bold;
+  padding:6px 0;
+  background:#fff;
+  border-bottom:2px solid #000;
+}
+body.ipad #phaseText{
+  font-size:24px;
+}
 </style>
 </head>
 
@@ -164,41 +175,6 @@ let fcTime=null;
 let dropTime=null;
 const nowSec=()=>endTime??Math.floor((Date.now()-startTime)/1000);
 
-/* ===== チャート上に比率を描くカスタムプラグイン =====
-   ※ このコードは Chart を初期化する（const chart = new Chart(...)）直前に入れてください */
-const phaseTextPlugin = {
-  id: "phaseTextPlugin",
-  afterDraw: function(chart){
-    // フェーズの比率を計算
-    const p = calcPhaseRatio();
-    if(!p) return; // データ不足なら描かない
-
-    const ctx = chart.ctx;
-    const area = chart.chartArea;
-    const left = area.left;
-    const top = area.top;
-
-    // 描画スタイル（必要ならここを調整）
-    ctx.save();
-    ctx.font = "bold 13px sans-serif";
-    ctx.fillStyle = "rgba(0,0,0,0.9)";
-    ctx.textBaseline = "top";
-
-    // 1行目：見出し（少し太く）
-    ctx.fillText("Phase Ratio", left + 8, top + 8);
-
-    // 2行目以降：実数値（改行しながら描く）
-    const lineY = top + 28;
-    const text = `Drying ${p.drying}%  |  Maillard ${p.maillard}%  |  Dev ${p.dev}% (${p.devTime})`;
-    ctx.font = "13px sans-serif";
-    ctx.fillText(text, left + 8, lineY);
-
-    ctx.restore();
-  }
-};
-
-// Chart にプラグインを登録してから Chart 初期化（下の const chart = ... の直前に置いてください）
-Chart.register(phaseTextPlugin);
 
 /* ===== Chart ===== */
 const chart=new Chart(document.getElementById("chart"),{
@@ -246,7 +222,10 @@ function calcPhaseRatio(){
     drying: toPct(drying),
     maillard: toPct(maillard),
     dev: toPct(dev),
-    devTime: secToMinSec(dev)   // mm:ss 表記
+    dryingTime: secToMinSec(drying),
+    maillardTime: secToMinSec(maillard),
+    devTime: secToMinSec(dev),
+    totalTime: secToMinSec(total)
   };
 }
 /* ===== ログ表 ===== */
@@ -313,15 +292,32 @@ addLine("dry",dryTime,"Dry End","orange");
 addLine("fc",fcTime,"1st Crack","red");
 addLine("drop",dropTime,"Drop","black");
  updateLogTable();
-const ratio = calcPhaseRatio();
-if(ratio){
- chart.options.plugins.title = {
-  display:true,
-  text:`Drying ${ratio.drying}% | Maillard ${ratio.maillard}% | Development ${ratio.dev}%`
- };
 
- document.getElementById("phaseText").innerHTML =
-  `Drying ${ratio.drying}% ｜ Maillard ${ratio.maillard}% ｜ Development ${ratio.dev}%`;
+const ratio = calcPhaseRatio();
+const phaseDiv = document.getElementById("phaseText");
+
+if(ratio){
+  phaseDiv.innerHTML = `
+  Drying ${ratio.drying}% ｜ 
+  Maillard ${ratio.maillard}% ｜ 
+  Development ${ratio.dev}% 
+  <span style="font-size:14px;color:#555;">(${ratio.devTime})</span>
+  `;
+} else {
+  phaseDiv.innerHTML = "";
+}
+const ratio = calcPhaseRatio();
+const phaseDiv = document.getElementById("phaseText");
+
+if(ratio){
+  phaseDiv.innerHTML = `
+  Drying ${ratio.drying}% (${ratio.dryingTime}) ｜ 
+  Maillard ${ratio.maillard}% (${ratio.maillardTime}) ｜ 
+  Dev ${ratio.dev}% (${ratio.devTime})<br>
+  <span style="font-size:14px;color:#555;">Total ${ratio.totalTime}</span>
+  `;
+} else {
+  phaseDiv.innerHTML = "";
 }
 chart.update();
 }
