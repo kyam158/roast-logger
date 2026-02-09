@@ -163,7 +163,41 @@ let dryTime=null;
 let fcTime=null;
 let dropTime=null;
 const nowSec=()=>endTime??Math.floor((Date.now()-startTime)/1000);
+/* ===== チャート上に比率を描くカスタムプラグイン =====
+   ※ このコードは Chart を初期化する（const chart = new Chart(...)）直前に入れてください */
+const phaseTextPlugin = {
+  id: "phaseTextPlugin",
+  afterDraw: function(chart){
+    // フェーズの比率を計算
+    const p = calcPhaseRatio();
+    if(!p) return; // データ不足なら描かない
 
+    const ctx = chart.ctx;
+    const area = chart.chartArea;
+    const left = area.left;
+    const top = area.top;
+
+    // 描画スタイル（必要ならここを調整）
+    ctx.save();
+    ctx.font = "bold 13px sans-serif";
+    ctx.fillStyle = "rgba(0,0,0,0.9)";
+    ctx.textBaseline = "top";
+
+    // 1行目：見出し（少し太く）
+    ctx.fillText("Phase Ratio", left + 8, top + 8);
+
+    // 2行目以降：実数値（改行しながら描く）
+    const lineY = top + 28;
+    const text = `Drying ${p.drying}%  |  Maillard ${p.maillard}%  |  Dev ${p.dev}% (${p.devTime})`;
+    ctx.font = "13px sans-serif";
+    ctx.fillText(text, left + 8, lineY);
+
+    ctx.restore();
+  }
+};
+
+// Chart にプラグインを登録してから Chart 初期化（下の const chart = ... の直前に置いてください）
+Chart.register(phaseTextPlugin);
 /* ===== Chart ===== */
 const chart=new Chart(document.getElementById("chart"),{
  type:"line",
@@ -193,19 +227,26 @@ function calcRoR(){
   const r=(c.y-p.y)*(60/dt);
   rorData.push({x:c.x,y:+r.toFixed(1)});
  }
-}function calcPhaseRatio(){
- if(!chargeTime||!dryTime||!fcTime||!dropTime) return null;
+}
 
- const drying = dryTime - chargeTime;
- const maillard = fcTime - dryTime;
- const dev = dropTime - fcTime;
- const total = dropTime - chargeTime;
+// 置き換え用：calcPhaseRatio（Dev時間も返す）
+function calcPhaseRatio(){
+  if(!chargeTime || !dryTime || !fcTime || !dropTime) return null;
 
- return {
-  drying: (drying/total*100).toFixed(1),
-  maillard: (maillard/total*100).toFixed(1),
-  dev: (dev/total*100).toFixed(1)
- };
+  const drying = dryTime - chargeTime;
+  const maillard = fcTime - dryTime;
+  const dev = dropTime - fcTime;
+  const total = dropTime - chargeTime;
+  if(total <= 0) return null;
+
+  const toPct = n => (n / total * 100).toFixed(1);
+
+  return {
+    drying: toPct(drying),
+    maillard: toPct(maillard),
+    dev: toPct(dev),
+    devTime: secToMinSec(dev)   // mm:ss 表記
+  };
 }
 
 /* ===== ログ表 ===== */
