@@ -8,7 +8,7 @@
 
 <title>Roast Logger Pro</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
-
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1"></script>
 <style>
 body{margin:0;font-family:-apple-system;background:#fafafa}
 #container{min-height:100vh}
@@ -61,7 +61,7 @@ body.iphone #panel{
 
 <!-- グラフ -->
 <div id="chartWrap"><canvas id="chart"></canvas></div>
-
+<div id="phaseText" style="text-align:center;font-size:18px;font-weight:bold;margin:4px 0;"></div>
 <!-- 1分ログ表 -->
 <div id="logTableWrap">
 <table id="logTable">
@@ -157,6 +157,11 @@ const secToMinSec=fmt;
 let startTime=null,endTime=null,timer=null;
 let temp=150,gas=2.5,startTemp=150;
 const tempData=[],gasData=[],rorData=[];
+let chargeTime=null;
+let tpTime=null;
+let dryTime=null;
+let fcTime=null;
+let dropTime=null;
 const nowSec=()=>endTime??Math.floor((Date.now()-startTime)/1000);
 
 /* ===== Chart ===== */
@@ -188,6 +193,19 @@ function calcRoR(){
   const r=(c.y-p.y)*(60/dt);
   rorData.push({x:c.x,y:+r.toFixed(1)});
  }
+}function calcPhaseRatio(){
+ if(!chargeTime||!dryTime||!fcTime||!dropTime) return null;
+
+ const drying = dryTime - chargeTime;
+ const maillard = fcTime - dryTime;
+ const dev = dropTime - fcTime;
+ const total = dropTime - chargeTime;
+
+ return {
+  drying: (drying/total*100).toFixed(1),
+  maillard: (maillard/total*100).toFixed(1),
+  dev: (dev/total*100).toFixed(1)
+ };
 }
 
 /* ===== ログ表 ===== */
@@ -232,10 +250,40 @@ function draw(){
  chart.data.datasets[0].data=tempData;
  chart.data.datasets[2].data=rorData;
  chart.data.datasets[3].data=gasData;
- chart.update();
- updateLogTable();
-}
+// ===== フェーズライン =====
+if(!chart.options.plugins) chart.options.plugins={};
+if(!chart.options.plugins.annotation) chart.options.plugins.annotation={};
+chart.options.plugins.annotation.annotations={};
 
+const addLine=(key,time,label,color)=>{
+ if(time==null) return;
+ chart.options.plugins.annotation.annotations[key]={
+  type:"line",
+  xMin:time,xMax:time,
+  borderColor:color,
+  borderWidth:2,
+  label:{display:true,content:label}
+ };
+};
+
+addLine("charge",chargeTime,"Charge","blue");
+addLine("tp",tpTime,"TP","purple");
+addLine("dry",dryTime,"Dry End","orange");
+addLine("fc",fcTime,"1st Crack","red");
+addLine("drop",dropTime,"Drop","black");
+ updateLogTable();
+const ratio = calcPhaseRatio();
+if(ratio){
+ chart.options.plugins.title = {
+  display:true,
+  text:`Drying ${ratio.drying}% | Maillard ${ratio.maillard}% | Development ${ratio.dev}%`
+ };
+
+ document.getElementById("phaseText").innerHTML =
+  `Drying ${ratio.drying}% ｜ Maillard ${ratio.maillard}% ｜ Development ${ratio.dev}%`;
+}
+chart.update();
+}
 /* ===== 操作 ===== */
 startBtn.onclick=()=>{
  startTemp=parseInt(startTempInput.value)||150;
@@ -272,14 +320,44 @@ let hold=null;
 const holdStart=f=>hold=setTimeout(f,600);
 const holdCancel=()=>clearTimeout(hold);
 
-dryBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>{addEventLog("Dry End");});};
-fcBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>{addEventLog("First Crack");});};
+dryBtn.onpointerdown=e=>{
+ e.preventDefault();
+ holdStart(()=>{
+  dryTime=nowSec();
+  addEventLog("Dry End");
+ });
+};
+
+fcBtn.onpointerdown=e=>{
+ e.preventDefault();
+ holdStart(()=>{
+  fcTime=nowSec();
+  addEventLog("First Crack");
+ });
+};
 [dryBtn,fcBtn].forEach(b=>{b.onpointerup=holdCancel;b.onpointercancel=holdCancel;});
 
-chargeBtn.onclick=()=>{addEventLog("Charge");};
-tpBtn.onclick=()=>{addEventLog("Turning Point");};
-dropBtn.onclick=()=>{endTime=nowSec();addEventLog("Drop");clearInterval(timer);draw();};
+chargeBtn.onclick=()=>{
+ chargeTime=nowSec();
+ addEventLog("Charge");
+};
 
+tpBtn.onclick=()=>{
+ tpTime=nowSec();
+ addEventLog("Turning Point");
+};
+dropBtn.onclick=()=>{
+ dropTime=nowSec();
+ endTime=dropTime;
+ addEventLog("Drop");
+ clearInterval(timer);
+ draw();
+
+ const ratio = calcPhaseRatio();
+ if(ratio){
+  alert(`Drying ${ratio.drying}% / Maillard ${ratio.maillard}% / Dev ${ratio.dev}%`);
+ }
+};
 /* iOSキーボード固定防止 */
 let scrollY=0;
 document.querySelectorAll("input").forEach(el=>{
