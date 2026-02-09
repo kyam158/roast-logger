@@ -193,6 +193,19 @@ function calcRoR(){
   const r=(c.y-p.y)*(60/dt);
   rorData.push({x:c.x,y:+r.toFixed(1)});
  }
+}function calcPhaseRatio(){
+ if(!chargeTime||!dryTime||!fcTime||!dropTime) return null;
+
+ const drying = dryTime - chargeTime;
+ const maillard = fcTime - dryTime;
+ const dev = dropTime - fcTime;
+ const total = dropTime - chargeTime;
+
+ return {
+  drying: (drying/total*100).toFixed(1),
+  maillard: (maillard/total*100).toFixed(1),
+  dev: (dev/total*100).toFixed(1)
+ };
 }
 
 /* ===== ログ表 ===== */
@@ -260,6 +273,13 @@ addLine("dry",dryTime,"Dry End","orange");
 addLine("fc",fcTime,"1st Crack","red");
 addLine("drop",dropTime,"Drop","black");
  updateLogTable();
+const ratio = calcPhaseRatio();
+if(ratio){
+ chart.options.plugins.title = {
+  display:true,
+  text:`Drying ${ratio.drying}% | Maillard ${ratio.maillard}% | Development ${ratio.dev}%`
+ };
+}
 }
 
 /* ===== 操作 ===== */
