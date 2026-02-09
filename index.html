@@ -2,27 +2,16 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-
-<!-- ★ iPhoneズーム防止（強力） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-
 <title>Roast Logger Pro</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1"></script>
 <style>
 body{margin:0;font-family:-apple-system;background:#fafafa}
 #container{min-height:100vh;}
-
-/* 左カラム内のチャート等を縦並びにするラッパー */
-#leftColumn{
-  display:block;
-}
-
-/* グラフラッパー */
+#leftColumn{display:block;}
 #chartWrap{height:45vh}
 #phaseText{ text-align:center;font-size:18px;font-weight:bold;margin:4px 0; }
-
-/* 共通フォーム要素 */
 button,input,select{width:100%;padding:12px;margin:6px 0;font-size:16px}
 .row{display:flex;gap:6px}
 .row>*{flex:1}
@@ -30,114 +19,43 @@ button,input,select{width:100%;padding:12px;margin:6px 0;font-size:16px}
 #csvBtn{background:#1976d2;color:#fff}
 #time{text-align:center;font-size:22px;margin:6px 0}
 button{touch-action:manipulation}
-
-/* ===== iPad 横並びUI =====
-   ここで #container を横並びにして、
-   左側を #leftColumn（縦並び）に、右側を #panel（操作）にする
-*/
-body.ipad #container{
-  display:flex;
-  flex-direction:row;
-  height:100vh;
-}
-
-/* 左カラム（グラフ・ログ・イベント表）を縦並び */
-body.ipad #leftColumn{
-  flex:1; /* 左側を広く使う */
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-  padding:8px;
-  overflow:auto;
-  box-sizing:border-box;
-}
-
-/* グラフは上段で少し大きめに */
-body.ipad #chartWrap{
-  height:46vh; /* iPad時はやや大きめ */
-}
-
-/* ログ表、イベント表は下側に */
+body.ipad #container{display:flex;flex-direction:row;height:100vh;}
+body.ipad #leftColumn{flex:1;display:flex;flex-direction:column;gap:10px;padding:8px;overflow:auto;box-sizing:border-box;}
+body.ipad #chartWrap{height:46vh;}
 #logTableWrap{max-height:28vh;overflow-y:auto;background:#fff;border-top:2px solid #000}
 #eventTableWrap{max-height:28vh;overflow-y:auto;background:#fff;border-top:2px solid #1565c0}
-
-/* 右側パネルは固定幅に（iPad） */
-body.ipad #panel{
-  flex:0 0 360px; /* 固定幅にして右に表示 */
-  overflow-y:auto;
-  padding-left:10px;
-  background:#fff;
-}
-
-/* iPad用文字サイズ調整（既存） */
+body.ipad #panel{flex:0 0 360px;overflow-y:auto;padding-left:10px;background:#fff;}
 body.ipad{font-size:18px}
 body.ipad button,body.ipad input{font-size:18px;padding:14px}
-
-/* ===== Log / Event table ===== */
 #logTable{width:100%;border-collapse:collapse;font-size:12px}
 #logTable th,#logTable td{border:1px solid #444;padding:2px 4px;text-align:center}
 #logTable thead{position:sticky;top:0;background:#000;color:#fff}
-
 #eventTable{width:100%;border-collapse:collapse;font-size:13px}
 #eventTable th,#eventTable td{border:1px solid #444;padding:4px;text-align:center}
 #eventTable thead{position:sticky;top:0;background:#1565c0;color:#fff}
-
-/* iPhone zoom防止 */
 input, textarea, select {font-size:16px !important;}
-@supports (-webkit-touch-callout: none) {
-  input, textarea, select {font-size:16px !important;}
-}
+@supports (-webkit-touch-callout: none) { input, textarea, select {font-size:16px !important;} }
 html{touch-action: manipulation;}
 body{overscroll-behavior: none;}
-
-/* ===== ★ iPhoneだけ下に余白追加 ===== */
-body.iphone #panel{
-  padding-bottom:120px;
-}
-
-/* canvas は親に充填させる */
+body.iphone #panel{ padding-bottom:120px; }
 canvas { width:100% !important; height:100% !important; display:block; }
 </style>
 </head>
-
 <body>
 <div id="container">
-
-  <!-- 左側：グラフ/ログ/イベントを縦に並べるラッパー -->
   <div id="leftColumn">
-    <!-- グラフ -->
     <div id="chartWrap"><canvas id="chart"></canvas></div>
     <div id="phaseText"></div>
-
-    <!-- 1分ログ表 -->
     <div id="logTableWrap">
-      <table id="logTable">
-        <thead>
-          <tr>
-            <th>Time</th><th>Temp</th><th>Gas</th><th>Air</th><th>RoR</th><th>Note</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+      <table id="logTable"><thead><tr><th>Time</th><th>Temp</th><th>Gas</th><th>Air</th><th>RoR</th><th>Note</th></tr></thead><tbody></tbody></table>
     </div>
-
-    <!-- イベント表 -->
     <div id="eventTableWrap">
-      <table id="eventTable">
-        <thead>
-          <tr>
-            <th>Event</th><th>Time</th><th>Temp</th><th>Gas</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+      <table id="eventTable"><thead><tr><th>Event</th><th>Time</th><th>Temp</th><th>Gas</th></tr></thead><tbody></tbody></table>
     </div>
-  </div> <!-- /leftColumn -->
+  </div>
 
-  <!-- 右側：操作パネルはそのまま右に -->
   <div id="panel">
     <div id="time">0:00</div>
-
     <label>開始温度</label>
     <input id="startTempInput" type="number" value="150">
     <button id="startBtn">焙煎開始</button>
@@ -183,20 +101,18 @@ canvas { width:100% !important; height:100% !important; display:block; }
       <input id="process" placeholder="Process">
       <input id="altitude" placeholder="Altitude (m)">
     </details>
-  </div> <!-- /panel -->
-
-</div> <!-- /container -->
+  </div>
+</div>
 
 <script>
 /* ===== Device判定 ===== */
-const isIPad =
- navigator.userAgent.includes("iPad") ||
- (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
+const isIPad = navigator.userAgent.includes("iPad") || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
 document.body.classList.add(isIPad ? "ipad" : "iphone");
 
 /* ===== util ===== */
 const fmt=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
 const secToMinSec=fmt;
+const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
 
 /* ===== 状態 ===== */
 let startTime=null,endTime=null,timer=null;
@@ -214,16 +130,7 @@ const chart=new Chart(document.getElementById("chart"),{
   {label:"RoR",data:[],yAxisID:"yRoR",borderWidth:2,tension:.3,pointRadius:0},
   {label:"Gas",data:[],yAxisID:"yR",borderDash:[4,4]}
  ]},
- options:{
-  animation:false,
-  maintainAspectRatio:false,
-  scales:{
-   x:{type:"linear",min:0,ticks:{stepSize:60,callback:v=>`${Math.floor(v/60)}:00`}},
-   y:{min:0,max:260,ticks:{stepSize:20}},
-   yR:{position:"right",min:0,max:5,grid:{drawOnChartArea:false}},
-   yRoR:{position:"right",min:0,max:40,offset:true,grid:{drawOnChartArea:false}}
-  }
- }
+ options:{animation:false,maintainAspectRatio:false,scales:{x:{type:"linear",min:0,ticks:{stepSize:60,callback:v=>`${Math.floor(v/60)}:00`}},y:{min:0,max:260,ticks:{stepSize:20}},yR:{position:"right",min:0,max:5,grid:{drawOnChartArea:false}},yRoR:{position:"right",min:0,max:40,offset:true,grid:{drawOnChartArea:false}}}}
 });
 
 /* ===== RoR ===== */
@@ -252,20 +159,13 @@ function calcPhaseRatio(){
 
 /* ===== ログ表 ===== */
 function updateLogTable(){
- const tbody=document.querySelector("#logTable tbody");
- tbody.innerHTML="";
+ const tbody=document.querySelector("#logTable tbody"); tbody.innerHTML="";
  for(let sec=0;sec<=nowSec();sec+=60){
   const t=[...tempData].reverse().find(d=>d.x<=sec);
   const g=[...gasData].reverse().find(d=>d.x<=sec);
   const r=[...rorData].reverse().find(d=>d.x<=sec);
   const tr=document.createElement("tr");
-  tr.innerHTML=`
-   <td>${secToMinSec(sec)}</td>
-   <td>${t?t.y.toFixed(0):""}</td>
-   <td>${g?g.y.toFixed(1):""}</td>
-   <td></td>
-   <td>${r?r.y.toFixed(1):""}</td>
-   <td></td>`;
+  tr.innerHTML=`<td>${secToMinSec(sec)}</td><td>${t?t.y.toFixed(0):""}</td><td>${g?g.y.toFixed(1):""}</td><td></td><td>${r?r.y.toFixed(1):""}</td><td></td>`;
   tbody.appendChild(tr);
  }
 }
@@ -274,18 +174,105 @@ function updateLogTable(){
 function addEventLog(name){
  const tbody=document.querySelector("#eventTable tbody");
  const tr=document.createElement("tr");
- tr.innerHTML=`
-  <td>${name}</td>
-  <td>${secToMinSec(nowSec())}</td>
-  <td>${temp.toFixed(0)}</td>
-  <td>${gas.toFixed(1)}</td>`;
+ tr.innerHTML=`<td>${name}</td><td>${secToMinSec(nowSec())}</td><td>${temp.toFixed(0)}</td><td>${gas.toFixed(1)}</td>`;
  tbody.appendChild(tr);
 }
+
+/* ===== CSVダウンロードユーティリティ（iOS対応） ===== */
+function downloadCSV(csvLines, filename){
+ const blob = new Blob([csvLines.join("\n")], {type: "text/csv;charset=utf-8;"});
+ const file = (window.File && window.File.prototype) ? new File([blob], filename, {type: blob.type}) : null;
+
+ // 1) Web Share API にファイル共有が使えるならそれを使う
+ if (file && navigator.canShare && navigator.canShare({files:[file]})) {
+   navigator.share({files:[file], title: filename}).catch((err)=> {
+     // 共有がキャンセルされたり失敗したら fallback に進む
+     fallbackDownload();
+   });
+   return;
+ }
+
+ // 2) 通常のダウンロードリンク
+ const url = URL.createObjectURL(blob);
+ const a = document.createElement("a");
+ a.href = url;
+ a.download = filename;
+ document.body.appendChild(a);
+
+ // iOS は download 属性を無視することがある → 新しいタブで開く（ユーザーが長押しして保存）
+ if (isIOS) {
+   // 直接新しいタブで開く（ユーザーは長押しで保存）
+   window.open(url, "_blank");
+   setTimeout(()=> URL.revokeObjectURL(url), 10000);
+   a.remove();
+   return;
+ }
+
+ // それ以外は自動クリック
+ a.click();
+ setTimeout(()=> {
+   document.body.removeChild(a);
+   URL.revokeObjectURL(url);
+ }, 1500);
+
+ function fallbackDownload(){
+   // iOS/その他で share に失敗した場合の保険
+   if (isIOS) {
+     window.open(url, "_blank");
+   } else {
+     a.click();
+   }
+   setTimeout(()=> { try{ URL.revokeObjectURL(url); }catch(e){} }, 10000);
+ }
+}
+
+/* ===== CSV作成・ボタンクリック処理 ===== */
+csvBtn.onclick = () => {
+ if(!tempData.length) return alert("データなし");
+
+ // 最新の豆情報を読み取る（もし必要なら）
+ const roastDate = document.getElementById("roastDate").value || "";
+ const country = document.getElementById("country").value || "";
+ const farm = document.getElementById("farm").value || "";
+ const variety = document.getElementById("variety").value || "";
+ const process = document.getElementById("process").value || "";
+ const altitude = document.getElementById("altitude").value || "";
+
+ const map = {};
+ tempData.forEach(d => { map[d.x] = map[d.x] || {}; map[d.x].t = d.y; });
+ gasData.forEach(d => { map[d.x] = map[d.x] || {}; map[d.x].g = d.y; });
+
+ const csv = [
+   "# Roast Logger CSV",
+   "# Date," + roastDate,
+   "# Country," + country,
+   "# Farm," + farm,
+   "# Variety," + variety,
+   "# Process," + process,
+   "# Altitude," + altitude,
+   "# Charge," + (chargeTime!=null ? secToMinSec(chargeTime) : ""),
+   "# TurningPoint," + (tpTime!=null ? secToMinSec(tpTime) : ""),
+   "# DryEnd," + (dryTime!=null ? secToMinSec(dryTime) : ""),
+   "# FirstCrack," + (fcTime!=null ? secToMinSec(fcTime) : ""),
+   "# Drop," + (dropTime!=null ? secToMinSec(dropTime) : ""),
+   "time(mm:ss),temperature(C),gas"
+ ];
+
+ Object.keys(map).sort((a,b)=>a-b).forEach(t => {
+   csv.push(`${secToMinSec(Number(t))},${map[t].t ?? ""},${map[t].g ?? ""}`);
+ });
+
+ const datePart = roastDate || new Date().toISOString().slice(0,10);
+ const safe = s => (s||"").toString().replace(/[\\/:*?"<>| ]+/g, "_");
+ const filename = `${safe(datePart)}_${safe(country)}_${safe(farm)}.csv`;
+
+ downloadCSV(csv, filename);
+};
 
 /* ===== 描画 ===== */
 function draw(){
  if(!startTime) return;
- const t=nowSec();
+ const t = nowSec();
  time.textContent = fmt(t);
  chart.options.scales.x.max = Math.max(600, t + 10);
  calcRoR();
@@ -293,33 +280,24 @@ function draw(){
  chart.data.datasets[2].data = rorData;
  chart.data.datasets[3].data = gasData;
 
- // フェーズライン（annotation plugin を使う設定が必要ならここで追加）
+ // フェーズライン設定（annotation）
  if(!chart.options.plugins) chart.options.plugins = {};
  if(!chart.options.plugins.annotation) chart.options.plugins.annotation = {};
  chart.options.plugins.annotation.annotations = {};
-
  const addLine=(key,time,label,color)=>{
    if(time==null) return;
-   chart.options.plugins.annotation.annotations[key] = {
-     type:"line",
-     xMin:time, xMax:time,
-     borderColor:color,
-     borderWidth:2,
-     label:{display:true,content:label}
-   };
+   chart.options.plugins.annotation.annotations[key] = { type:"line", xMin:time, xMax:time, borderColor:color, borderWidth:2, label:{display:true,content:label} };
  };
-
  addLine("charge",chargeTime,"Charge","blue");
  addLine("tp",tpTime,"TP","purple");
  addLine("dry",dryTime,"Dry End","orange");
  addLine("fc",fcTime,"1st Crack","red");
  addLine("drop",dropTime,"Drop","black");
 
- // フェーズ比率テキストを下に表示
+ // フェーズ比率テキスト更新
  const ratio = calcPhaseRatio();
  if(ratio){
-   document.getElementById("phaseText").textContent =
-     `Drying ${ratio.drying}% ｜ Maillard ${ratio.maillard}% ｜ Development ${ratio.dev}%`;
+   document.getElementById("phaseText").textContent = `Drying ${ratio.drying}% ｜ Maillard ${ratio.maillard}% ｜ Development ${ratio.dev}%`;
  } else {
    document.getElementById("phaseText").textContent = "";
  }
@@ -364,37 +342,13 @@ let hold=null;
 const holdStart=f=>hold=setTimeout(f,600);
 const holdCancel=()=>clearTimeout(hold);
 
-dryBtn.onpointerdown=e=>{
- e.preventDefault();
- holdStart(()=>{
-  dryTime = nowSec();
-  addEventLog("Dry End");
- });
-};
-fcBtn.onpointerdown=e=>{
- e.preventDefault();
- holdStart(()=>{
-  fcTime = nowSec();
-  addEventLog("First Crack");
- });
-};
-[dryBtn,fcBtn].forEach(b=>{b.onpointerup=holdCancel;b.onpointercancel=holdCancel;});
+dryBtn.onpointerdown=e=>{ e.preventDefault(); holdStart(()=>{ dryTime = nowSec(); addEventLog("Dry End"); }); };
+fcBtn.onpointerdown=e=>{ e.preventDefault(); holdStart(()=>{ fcTime = nowSec(); addEventLog("First Crack"); }); };
+[dryBtn,fcBtn].forEach(b=>{ b.onpointerup=holdCancel; b.onpointercancel=holdCancel; });
 
-chargeBtn.onclick=()=>{
- chargeTime = nowSec();
- addEventLog("Charge");
-};
-tpBtn.onclick=()=>{
- tpTime = nowSec();
- addEventLog("Turning Point");
-};
-dropBtn.onclick=()=>{
- dropTime = nowSec();
- endTime = dropTime;
- addEventLog("Drop");
- clearInterval(timer);
- draw();
-};
+chargeBtn.onclick=()=>{ chargeTime = nowSec(); addEventLog("Charge"); };
+tpBtn.onclick=()=>{ tpTime = nowSec(); addEventLog("Turning Point"); };
+dropBtn.onclick=()=>{ dropTime = nowSec(); endTime = dropTime; addEventLog("Drop"); clearInterval(timer); draw(); };
 
 /* iOSキーボード固定防止 */
 let scrollY=0;
