@@ -88,6 +88,17 @@ body.ipad #phaseText{
 <!-- イベント表 -->
 <div id="eventTableWrap">
 <table id="eventTable">
+  <div id="phaseText" style="
+ font-size:16px;
+ font-weight:bold;
+ margin:10px;
+ padding:8px;
+ background:#111;
+ color:#0f0;
+ border-radius:8px;
+ text-align:center;">
+</div>
+  
 <thead>
 <tr>
 <th>Event</th><th>Time</th><th>Temp</th><th>Gas</th>
@@ -346,20 +357,15 @@ let hold=null;
 const holdStart=f=>hold=setTimeout(f,600);
 const holdCancel=()=>clearTimeout(hold);
 
-dryBtn.onpointerdown=e=>{
- e.preventDefault();
- holdStart(()=>{
-  dryTime=nowSec();
-  addEventLog("Dry End");
- });
-};
+dryBtn.onpointerdown=()=>{dryHold=setTimeout(()=>{
+ dryTime=Date.now()-startTime;
+ addEvent("Dry End",dryTime,temp,gas);
+},800)};
 
-fcBtn.onpointerdown=e=>{
- e.preventDefault();
- holdStart(()=>{
-  fcTime=nowSec();
-  addEventLog("First Crack");
- });
+fcBtn.onpointerdown=()=>{fcHold=setTimeout(()=>{
+ fcTime=Date.now()-startTime;
+ addEvent("1st Crack",fcTime,temp,gas);
+},800)};
 };
 [dryBtn,fcBtn].forEach(b=>{b.onpointerup=holdCancel;b.onpointercancel=holdCancel;});
 
@@ -373,10 +379,10 @@ tpBtn.onclick=()=>{
  addEventLog("Turning Point");
 };
 dropBtn.onclick=()=>{
- dropTime=nowSec();
- endTime=dropTime;
- addEventLog("Drop");
- clearInterval(timer);
+ dropTime=Date.now()-startTime;
+ addEvent("Drop",dropTime,temp,gas);
+ showPhaseRatio(); // ← ★これを追加
+};
  draw();
 };
 /* iOSキーボード固定防止 */
@@ -393,6 +399,29 @@ document.querySelectorAll("input").forEach(el=>{
   window.scrollTo(0,scrollY);
  });
 });
+
+function showPhaseRatio() {
+ if(!chargeTime || !dryTime || !fcTime || !dropTime) return;
+
+ const total = dropTime - chargeTime;
+ const dry = dryTime - chargeTime;
+ const mai = fcTime - dryTime;
+ const dev = dropTime - fcTime;
+
+ const dryP = (dry/total*100).toFixed(1);
+ const maiP = (mai/total*100).toFixed(1);
+ const devP = (dev/total*100).toFixed(1);
+
+ document.getElementById("phaseText").innerHTML =
+  `Dry: ${sec(dry)} (${dryP}%)<br>
+   Maillard: ${sec(mai)} (${maiP}%)<br>
+   Dev: ${sec(dev)} (${devP}%)`;
+}
+
+function sec(ms){
+ let s=Math.floor(ms/1000);
+ return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
+}
 </script>
 </body>
 </html>
