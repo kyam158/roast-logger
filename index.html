@@ -296,7 +296,7 @@ addLine("drop",dropTime,"Drop","black");
 const ratio = calcPhaseRatio();
 const phaseDiv = document.getElementById("phaseText");
 
-if(ratio){
+if(dropTime && ratio){
   phaseDiv.innerHTML = `
   Drying ${ratio.drying}% (${ratio.dryingTime}) ｜ 
   Maillard ${ratio.maillard}% (${ratio.maillardTime}) ｜ 
