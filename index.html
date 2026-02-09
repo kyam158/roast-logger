@@ -88,15 +88,7 @@ body.ipad #phaseText{
 <!-- イベント表 -->
 <div id="eventTableWrap">
 <table id="eventTable">
-  <div id="phaseText" style="
- font-size:16px;
- font-weight:bold;
- margin:10px;
- padding:8px;
- background:#111;
- color:#0f0;
- border-radius:8px;
- text-align:center;">
+ 
 </div>
   
 <thead>
@@ -326,13 +318,18 @@ startBtn.onclick=()=>{
  startTemp=parseInt(startTempInput.value)||150;
  temp=startTemp;
  startTime=Date.now();endTime=null;
+
+ chargeTime=tpTime=dryTime=fcTime=dropTime=null;
+
  tempData.length=0;gasData.length=0;rorData.length=0;
  document.querySelector("#eventTable tbody").innerHTML="";
+
  tempData.push({x:0,y:startTemp});
  gasData.push({x:0,y:gas});
  clearInterval(timer);
  timer=setInterval(draw,1000);
  draw();
+};
 };
 
 tempSet.onclick=()=>{
@@ -357,16 +354,24 @@ let hold=null;
 const holdStart=f=>hold=setTimeout(f,600);
 const holdCancel=()=>clearTimeout(hold);
 
-dryBtn.onpointerdown=()=>{dryHold=setTimeout(()=>{
- dryTime=Date.now()-startTime;
- addEvent("Dry End",dryTime,temp,gas);
-},800)};
+let dryHold=null;
+let fcHold=null;
 
-fcBtn.onpointerdown=()=>{fcHold=setTimeout(()=>{
- fcTime=Date.now()-startTime;
- addEvent("1st Crack",fcTime,temp,gas);
-},800)};
+dryBtn.onpointerdown=()=>{
+ dryHold=setTimeout(()=>{
+  dryTime=nowSec();
+  addEventLog("Dry End");
+ },800);
 };
+dryBtn.onpointerup=()=>clearTimeout(dryHold);
+
+fcBtn.onpointerdown=()=>{
+ fcHold=setTimeout(()=>{
+  fcTime=nowSec();
+  addEventLog("1st Crack");
+ },800);
+};
+fcBtn.onpointerup=()=>clearTimeout(fcHold);
 [dryBtn,fcBtn].forEach(b=>{b.onpointerup=holdCancel;b.onpointercancel=holdCancel;});
 
 chargeBtn.onclick=()=>{
@@ -379,11 +384,10 @@ tpBtn.onclick=()=>{
  addEventLog("Turning Point");
 };
 dropBtn.onclick=()=>{
- dropTime=Date.now()-startTime;
- addEvent("Drop",dropTime,temp,gas);
- showPhaseRatio(); // ← ★これを追加
+ dropTime=nowSec();
+ addEventLog("Drop");
+ draw(); // フェーズ表示更新
 };
- draw();
 };
 /* iOSキーボード固定防止 */
 let scrollY=0;
