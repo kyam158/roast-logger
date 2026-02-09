@@ -8,7 +8,7 @@
 
 <title>Roast Logger Pro</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
-
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1"></script>
 <style>
 body{margin:0;font-family:-apple-system;background:#fafafa}
 #container{min-height:100vh}
@@ -157,6 +157,11 @@ const secToMinSec=fmt;
 let startTime=null,endTime=null,timer=null;
 let temp=150,gas=2.5,startTemp=150;
 const tempData=[],gasData=[],rorData=[];
+let chargeTime=null;
+let tpTime=null;
+let dryTime=null;
+let fcTime=null;
+let dropTime=null;
 const nowSec=()=>endTime??Math.floor((Date.now()-startTime)/1000);
 
 /* ===== Chart ===== */
@@ -233,6 +238,27 @@ function draw(){
  chart.data.datasets[2].data=rorData;
  chart.data.datasets[3].data=gasData;
  chart.update();
+// ===== フェーズライン =====
+if(!chart.options.plugins) chart.options.plugins={};
+if(!chart.options.plugins.annotation) chart.options.plugins.annotation={};
+chart.options.plugins.annotation.annotations={};
+
+const addLine=(key,time,label,color)=>{
+ if(time==null) return;
+ chart.options.plugins.annotation.annotations[key]={
+  type:"line",
+  xMin:time,xMax:time,
+  borderColor:color,
+  borderWidth:2,
+  label:{display:true,content:label}
+ };
+};
+
+addLine("charge",chargeTime,"Charge","blue");
+addLine("tp",tpTime,"TP","purple");
+addLine("dry",dryTime,"Dry End","orange");
+addLine("fc",fcTime,"1st Crack","red");
+addLine("drop",dropTime,"Drop","black");
  updateLogTable();
 }
 
@@ -272,14 +298,39 @@ let hold=null;
 const holdStart=f=>hold=setTimeout(f,600);
 const holdCancel=()=>clearTimeout(hold);
 
-dryBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>{addEventLog("Dry End");});};
-fcBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>{addEventLog("First Crack");});};
+dryBtn.onpointerdown=e=>{
+ e.preventDefault();
+ holdStart(()=>{
+  dryTime=nowSec();
+  addEventLog("Dry End");
+ });
+};
+
+fcBtn.onpointerdown=e=>{
+ e.preventDefault();
+ holdStart(()=>{
+  fcTime=nowSec();
+  addEventLog("First Crack");
+ });
+};
 [dryBtn,fcBtn].forEach(b=>{b.onpointerup=holdCancel;b.onpointercancel=holdCancel;});
 
-chargeBtn.onclick=()=>{addEventLog("Charge");};
-tpBtn.onclick=()=>{addEventLog("Turning Point");};
-dropBtn.onclick=()=>{endTime=nowSec();addEventLog("Drop");clearInterval(timer);draw();};
+chargeBtn.onclick=()=>{
+ chargeTime=nowSec();
+ addEventLog("Charge");
+};
 
+tpBtn.onclick=()=>{
+ tpTime=nowSec();
+ addEventLog("Turning Point");
+};
+dropBtn.onclick=()=>{
+ dropTime=nowSec();
+ endTime=dropTime;
+ addEventLog("Drop");
+ clearInterval(timer);
+ draw();
+};
 /* iOSキーボード固定防止 */
 let scrollY=0;
 document.querySelectorAll("input").forEach(el=>{
