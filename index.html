@@ -13,7 +13,10 @@
 body{margin:0;font-family:-apple-system;background:#fafafa}
 #container{min-height:100vh}
 
-#chartWrap{height:45vh}
+/* chartWrapを相対配置にしてオーバーレイ可能に */
+#chartWrap{position:relative;height:45vh}
+
+/* 共通ボタン等 */
 button,input,select{width:100%;padding:12px;margin:6px 0;font-size:16px}
 .row{display:flex;gap:6px}
 .row>*{flex:1}
@@ -22,10 +25,29 @@ button,input,select{width:100%;padding:12px;margin:6px 0;font-size:16px}
 #time{text-align:center;font-size:22px;margin:6px 0}
 button{touch-action:manipulation}
 
-/* ===== iPad 横並びUI ===== */
-body.ipad #container{display:flex;flex-direction:row;height:100vh}
-body.ipad #chartWrap{flex:1.2;height:60vh}
-body.ipad #panel{flex:1;overflow-y:auto;padding-left:10px;background:#fff}
+/* ===== iPad レイアウト：**縦並び**（変更） ===== */
+body.ipad #container{
+  display:flex;
+  flex-direction:column; /* ← 横並びから縦並びへ */
+  height:100vh;
+}
+
+/* iPadでグラフを大きく表示 */
+body.ipad #chartWrap{
+  height:55vh; /* グラフを大きめに */
+}
+
+/* iPadでパネルは残り高さをスクロール */
+body.ipad #panel{
+  flex:0 0 calc(45vh - 10px);
+  overflow-y:auto;
+  padding-left:10px;
+  background:#fff;
+  box-sizing:border-box;
+}
+
+/* ===== それ以外（基本） ===== */
+/* ===== iPad専用のフォント調整等（残しておく） ===== */
 body.ipad{font-size:18px}
 body.ipad button,body.ipad input{font-size:18px;padding:14px}
 
@@ -53,6 +75,20 @@ body{overscroll-behavior: none;}
 body.iphone #panel{
   padding-bottom:120px;
 }
+
+/* 小さな美化（グラフ上に比率等を置く用） */
+#phaseText{
+  position:absolute;
+  top:8px;
+  left:50%;
+  transform:translateX(-50%);
+  background:rgba(255,255,255,0.8);
+  padding:6px 10px;
+  border-radius:8px;
+  font-weight:bold;
+  pointer-events:none;
+  z-index:5;
+}
 </style>
 </head>
 
@@ -60,8 +96,10 @@ body.iphone #panel{
 <div id="container">
 
 <!-- グラフ -->
-<div id="chartWrap"><canvas id="chart"></canvas></div>
-<div id="phaseText" style="text-align:center;font-size:18px;font-weight:bold;margin:4px 0;"></div>
+<div id="chartWrap"><canvas id="chart"></canvas>
+  <div id="phaseText" style="display:none;"></div>
+</div>
+
 <!-- 1分ログ表 -->
 <div id="logTableWrap">
 <table id="logTable">
@@ -164,42 +202,6 @@ let fcTime=null;
 let dropTime=null;
 const nowSec=()=>endTime??Math.floor((Date.now()-startTime)/1000);
 
-/* ===== チャート上に比率を描くカスタムプラグイン =====
-   ※ このコードは Chart を初期化する（const chart = new Chart(...)）直前に入れてください */
-const phaseTextPlugin = {
-  id: "phaseTextPlugin",
-  afterDraw: function(chart){
-    // フェーズの比率を計算
-    const p = calcPhaseRatio();
-    if(!p) return; // データ不足なら描かない
-
-    const ctx = chart.ctx;
-    const area = chart.chartArea;
-    const left = area.left;
-    const top = area.top;
-
-    // 描画スタイル（必要ならここを調整）
-    ctx.save();
-    ctx.font = "bold 13px sans-serif";
-    ctx.fillStyle = "rgba(0,0,0,0.9)";
-    ctx.textBaseline = "top";
-
-    // 1行目：見出し（少し太く）
-    ctx.fillText("Phase Ratio", left + 8, top + 8);
-
-    // 2行目以降：実数値（改行しながら描く）
-    const lineY = top + 28;
-    const text = `Drying ${p.drying}%  |  Maillard ${p.maillard}%  |  Dev ${p.dev}% (${p.devTime})`;
-    ctx.font = "13px sans-serif";
-    ctx.fillText(text, left + 8, lineY);
-
-    ctx.restore();
-  }
-};
-
-// Chart にプラグインを登録してから Chart 初期化（下の const chart = ... の直前に置いてください）
-Chart.register(phaseTextPlugin);
-
 /* ===== Chart ===== */
 const chart=new Chart(document.getElementById("chart"),{
  type:"line",
@@ -230,25 +232,19 @@ function calcRoR(){
   rorData.push({x:c.x,y:+r.toFixed(1)});
  }
 }
-// 置き換え用：calcPhaseRatio（Dev時間も返す）
 function calcPhaseRatio(){
-  if(!chargeTime || !dryTime || !fcTime || !dropTime) return null;
-
-  const drying = dryTime - chargeTime;
-  const maillard = fcTime - dryTime;
-  const dev = dropTime - fcTime;
-  const total = dropTime - chargeTime;
-  if(total <= 0) return null;
-
-  const toPct = n => (n / total * 100).toFixed(1);
-
-  return {
-    drying: toPct(drying),
-    maillard: toPct(maillard),
-    dev: toPct(dev),
-    devTime: secToMinSec(dev)   // mm:ss 表記
-  };
+ if(chargeTime==null || dryTime==null || fcTime==null || dropTime==null) return null;
+ const drying = dryTime - chargeTime;
+ const maillard = fcTime - dryTime;
+ const dev = dropTime - fcTime;
+ const total = dropTime - chargeTime;
+ return {
+  drying: (drying/total*100).toFixed(1),
+  maillard: (maillard/total*100).toFixed(1),
+  dev: (dev/total*100).toFixed(1)
+ };
 }
+
 /* ===== ログ表 ===== */
 function updateLogTable(){
  const tbody=document.querySelector("#logTable tbody");
@@ -291,39 +287,41 @@ function draw(){
  chart.data.datasets[0].data=tempData;
  chart.data.datasets[2].data=rorData;
  chart.data.datasets[3].data=gasData;
-// ===== フェーズライン =====
-if(!chart.options.plugins) chart.options.plugins={};
-if(!chart.options.plugins.annotation) chart.options.plugins.annotation={};
-chart.options.plugins.annotation.annotations={};
 
-const addLine=(key,time,label,color)=>{
- if(time==null) return;
- chart.options.plugins.annotation.annotations[key]={
-  type:"line",
-  xMin:time,xMax:time,
-  borderColor:color,
-  borderWidth:2,
-  label:{display:true,content:label}
+ // ===== フェーズライン =====
+ if(!chart.options.plugins) chart.options.plugins={};
+ if(!chart.options.plugins.annotation) chart.options.plugins.annotation={};
+ chart.options.plugins.annotation.annotations={};
+
+ const addLine=(key,time,label,color)=>{
+  if(time==null) return;
+  chart.options.plugins.annotation.annotations[key]={
+   type:"line",
+   xMin:time,xMax:time,
+   borderColor:color,
+   borderWidth:2,
+   label:{display:true,content:label}
+  };
  };
-};
 
-addLine("charge",chargeTime,"Charge","blue");
-addLine("tp",tpTime,"TP","purple");
-addLine("dry",dryTime,"Dry End","orange");
-addLine("fc",fcTime,"1st Crack","red");
-addLine("drop",dropTime,"Drop","black");
+ addLine("charge",chargeTime,"Charge","blue");
+ addLine("tp",tpTime,"TP","purple");
+ addLine("dry",dryTime,"Dry End","orange");
+ addLine("fc",fcTime,"1st Crack","red");
+ addLine("drop",dropTime,"Drop","black");
+
  updateLogTable();
-const ratio = calcPhaseRatio();
-if(ratio){
- chart.options.plugins.title = {
-  display:true,
-  text:`Drying ${ratio.drying}% | Maillard ${ratio.maillard}% | Development ${ratio.dev}%`
- };
 
- document.getElementById("phaseText").innerHTML =
-  `Drying ${ratio.drying}% ｜ Maillard ${ratio.maillard}% ｜ Development ${ratio.dev}%`;
-}
-chart.update();
+ const ratio = calcPhaseRatio();
+ const phaseEl = document.getElementById("phaseText");
+ if(ratio){
+  phaseEl.style.display = "block";
+  phaseEl.textContent = `Drying ${ratio.drying}% ｜ Maillard ${ratio.maillard}% ｜ Dev ${ratio.dev}%`;
+ } else {
+  phaseEl.style.display = "none";
+ }
+
+ chart.update();
 }
 
 /* ===== 操作 ===== */
