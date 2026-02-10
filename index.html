@@ -84,6 +84,11 @@ body.ipad #chartWrap{height:48vh}
   body.ipad #leftCol{min-width:0}
   body.ipad #rightCol{min-width:0;max-width:none}
 }
+
+/* DB result table small */
+#dbResults{max-height:240px;overflow:auto;margin-top:6px;border:1px solid #ddd;background:#fff}
+#dbResults table{font-size:12px}
+#dbStats{background:#fff;padding:8px;border:1px solid #eee;margin-top:6px}
 </style>
 </head>
 
@@ -170,6 +175,33 @@ body.ipad #chartWrap{height:48vh}
       <div class="history-controls">
         <select id="compareSelect"><option value="">比較（Compare）</option></select>
         <button id="clearCompareBtn">Clear Compare</button>
+      </div>
+
+      <!-- ===== DB Search UI (追加) ===== -->
+      <h3>DB Search</h3>
+      <label>Country</label><input id="filterCountry" placeholder="例：Ethiopia">
+      <label>Farm</label><input id="filterFarm" placeholder="例：Yirgacheffe">
+      <label>Variety</label><input id="filterVariety" placeholder="例：Heirloom">
+      <label>Process</label><input id="filterProcess" placeholder="Washed / Natural">
+      <div class="row">
+        <input id="filterAltMin" type="number" placeholder="alt min (m)">
+        <input id="filterAltMax" type="number" placeholder="alt max (m)">
+      </div>
+      <div class="row">
+        <input id="filterDateFrom" type="date" placeholder="from">
+        <input id="filterDateTo" type="date" placeholder="to">
+      </div>
+      <div class="row">
+        <button id="searchDbBtn">Search DB</button>
+        <button id="clearFilterBtn">Clear</button>
+      </div>
+
+      <div id="dbStats" aria-live="polite" style="display:none"></div>
+      <div id="dbResults" style="display:none">
+        <table id="dbTable">
+          <thead><tr><th>#</th><th>Date</th><th>Country</th><th>Farm</th><th>Variety</th><th>Process</th><th>Alt</th><th>Dev%</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
       </div>
 
       <h3>Green Bean Info</h3>
@@ -485,7 +517,9 @@ document.getElementById("dropBtn").onclick = () => {
  saveHistory(); // 保存
 };
 
-/* ====== ここから履歴/CSV/比較まわり（追加） ====== */
+/* ====== 履歴/CSV/比較の既存機能（保持） ====== */
+/* saveHistory, updateHistory, historySelect onchange, exportSnapshot, delete, rename, compareSelect, csv export, import... */
+/* （ここは既存と同じコードを動かすため省略しないでそのまま置いています） */
 
 /* saveHistory: 履歴を localStorage に保存 */
 function saveHistory(){
@@ -740,7 +774,7 @@ document.getElementById("csvBtn").onclick = () => {
  URL.revokeObjectURL(url);
 };
 
-/* CSV Import: loadCsv input handler */
+/* CSV Import: loadCsv input handler (existing) */
 document.getElementById("loadCsv").onchange = e => {
  const file = e.target.files[0];
  if(!file) return;
@@ -822,8 +856,163 @@ document.getElementById("loadCsv").onchange = e => {
  reader.readAsText(file);
 };
 
-/* initialize history dropdown */
+/* ========== ここから DB 検索 / 統計機能 ========== */
+
+/* helper: compute dev% (and drying/maillard) for snapshot */
+function computePhasesForSnapshot(s){
+  // use tpTime/dryTime/fcTime/dropTime stored in snapshot
+  const tp = s.tpTime, dry = s.dryTime, fc = s.fcTime, drop = s.dropTime;
+  if(tp==null || dry==null || fc==null || drop==null) return null;
+  const drying = dry - tp;
+  const maillard = fc - dry;
+  const dev = drop - fc;
+  const total = drop - tp;
+  if(total <= 0) return null;
+  return {
+    drying, maillard, dev,
+    dryingPct: drying/total*100,
+    maillardPct: maillard/total*100,
+    devPct: dev/total*100
+  };
+}
+
+/* search DB with filters from UI */
+function searchRoastHistory(){
+  const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+  const fCountry = (document.getElementById("filterCountry").value || "").trim().toLowerCase();
+  const fFarm = (document.getElementById("filterFarm").value || "").trim().toLowerCase();
+  const fVar = (document.getElementById("filterVariety").value || "").trim().toLowerCase();
+  const fProc = (document.getElementById("filterProcess").value || "").trim().toLowerCase();
+  const altMin = parseFloat(document.getElementById("filterAltMin").value);
+  const altMax = parseFloat(document.getElementById("filterAltMax").value);
+  const dateFrom = document.getElementById("filterDateFrom").value;
+  const dateTo = document.getElementById("filterDateTo").value;
+
+  const results = h.map((s, idx) => ({s, idx})).filter(item => {
+    const s = item.s;
+    const meta = s.meta || {};
+    if(fCountry && !(meta.country||"").toLowerCase().includes(fCountry)) return false;
+    if(fFarm && !(meta.farm||"").toLowerCase().includes(fFarm)) return false;
+    if(fVar && !(meta.variety||"").toLowerCase().includes(fVar)) return false;
+    if(fProc && !(meta.process||"").toLowerCase().includes(fProc)) return false;
+    if(!isNaN(altMin) && altMin !== null){
+      const a = parseFloat(meta.altitude);
+      if(isNaN(a) || a < altMin) return false;
+    }
+    if(!isNaN(altMax) && altMax !== null){
+      const a = parseFloat(meta.altitude);
+      if(isNaN(a) || a > altMax) return false;
+    }
+    if(dateFrom){
+      const d = meta.date || "";
+      if(!d || d < dateFrom) return false;
+    }
+    if(dateTo){
+      const d = meta.date || "";
+      if(!d || d > dateTo) return false;
+    }
+    return true;
+  });
+
+  renderSearchResults(results);
+}
+
+/* render results table & stats */
+function renderSearchResults(results){
+  const container = document.getElementById("dbResults");
+  const tbody = document.querySelector("#dbTable tbody");
+  tbody.innerHTML = "";
+  if(!results.length){
+    container.style.display = "none";
+    document.getElementById("dbStats").style.display = "none";
+    document.getElementById("dbStats").innerHTML = "";
+    return;
+  }
+  container.style.display = "block";
+  let sumDev=0, countDev=0, sumDry=0, sumMail=0;
+  results.forEach((item,i)=>{
+    const s = item.s;
+    const idx = item.idx;
+    const meta = s.meta || {};
+    const phases = computePhasesForSnapshot(s);
+    let devText = phases ? (phases.devPct.toFixed(1)+"%") : "-";
+    if(phases){ sumDev += phases.devPct; sumDry += phases.dryingPct; sumMail += phases.maillardPct; countDev++; }
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${i+1}</td>
+      <td>${meta.date||""}</td>
+      <td>${meta.country||""}</td>
+      <td>${meta.farm||""}</td>
+      <td>${meta.variety||""}</td>
+      <td>${meta.process||""}</td>
+      <td>${meta.altitude||""}</td>
+      <td>${devText}</td>
+      <td>
+        <button data-idx="${idx}" class="db-load">Load</button>
+        <button data-idx="${idx}" class="db-compare">Compare</button>
+        <button data-idx="${idx}" class="db-export">Export</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+
+  // stats
+  const statsNode = document.getElementById("dbStats");
+  const avgDev = countDev ? (sumDev/countDev).toFixed(1) : "-";
+  const avgDry = countDev ? (sumDry/countDev).toFixed(1) : "-";
+  const avgMail = countDev ? (sumMail/countDev).toFixed(1) : "-";
+  statsNode.style.display = "block";
+  statsNode.innerHTML = `<strong>Results:</strong> ${results.length} &nbsp; <strong>Avg Dev%</strong>: ${avgDev}% &nbsp; <strong>Avg Dry%</strong>: ${avgDry}% &nbsp; <strong>Avg Maillard%</strong>: ${avgMail}%`;
+
+  // attach handlers (delegation would be fine, but keep simple)
+  Array.from(document.querySelectorAll(".db-load")).forEach(b=>{
+    b.onclick = e => {
+      const idx = e.currentTarget.getAttribute("data-idx");
+      document.getElementById("historySelect").value = idx;
+      document.getElementById("historySelect").dispatchEvent(new Event('change'));
+    };
+  });
+  Array.from(document.querySelectorAll(".db-compare")).forEach(b=>{
+    b.onclick = e => {
+      const idx = e.currentTarget.getAttribute("data-idx");
+      const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+      const s = h[idx];
+      if(!s) return alert("履歴が見つかりません");
+      chart.data.datasets[4].data = (s.tempData||[]).map(d=>({x:d.x,y:d.y}));
+      chart.data.datasets[4].hidden = false;
+      document.getElementById("compareSelect").value = idx;
+      chart.update();
+    };
+  });
+  Array.from(document.querySelectorAll(".db-export")).forEach(b=>{
+    b.onclick = e => {
+      const idx = e.currentTarget.getAttribute("data-idx");
+      const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+      const s = h[idx];
+      if(!s) return alert("履歴が見つかりません");
+      exportSnapshot(s);
+    };
+  });
+}
+
+/* clear filters */
+document.getElementById("clearFilterBtn").onclick = () => {
+  ["filterCountry","filterFarm","filterVariety","filterProcess","filterAltMin","filterAltMax","filterDateFrom","filterDateTo"].forEach(id=>{
+    document.getElementById(id).value = "";
+  });
+  document.getElementById("dbResults").style.display = "none";
+  document.getElementById("dbStats").style.display = "none";
+};
+
+/* wire search button */
+document.getElementById("searchDbBtn").onclick = () => {
+  searchRoastHistory();
+};
+
+/* Initialize history dropdown on load */
 updateHistory();
+
+/* expose for debugging (optional) */
+window._roast_search = { searchRoastHistory, renderSearchResults, computePhasesForSnapshot };
+
 </script>
 </body>
 </html>
