@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Roast Logger Pro FujiRoyal 1kg</title>
 
-<title>Roast Logger Pro</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1"></script>
 
@@ -18,13 +18,19 @@ button,input,select{width:100%;padding:12px;margin:6px 0;font-size:16px}
 #dropBtn{background:#d32f2f;color:#fff;font-weight:bold}
 #csvBtn{background:#1976d2;color:#fff}
 #time{text-align:center;font-size:22px;margin:6px 0}
-#phaseText{text-align:center;font-size:18px;font-weight:bold;margin:4px 0}
+#phaseText{text-align:center;font-size:16px;font-weight:bold}
 button{touch-action:manipulation}
 
-#logTableWrap,#eventTableWrap{max-height:18vh;overflow-y:auto;background:#fff;border-top:2px solid #000}
+body.ipad #container{display:flex;height:100vh}
+body.ipad #chartWrap{flex:1.2;height:60vh}
+body.ipad #panel{flex:1;overflow:auto;padding-left:10px;background:#fff}
+
+#logTableWrap,#eventTableWrap{max-height:20vh;overflow:auto;background:#fff}
 table{width:100%;border-collapse:collapse;font-size:12px}
 th,td{border:1px solid #444;padding:2px;text-align:center}
 thead{position:sticky;top:0;background:#000;color:#fff}
+
+input,select{font-size:16px!important}
 </style>
 </head>
 
@@ -32,23 +38,10 @@ thead{position:sticky;top:0;background:#000;color:#fff}
 <div id="container">
 
 <div id="chartWrap"><canvas id="chart"></canvas></div>
-<div id="phaseText"></div>
-
-<div id="logTableWrap">
-<table id="logTable">
-<thead><tr><th>Time</th><th>Temp</th><th>Gas</th><th>RoR</th></tr></thead>
-<tbody></tbody>
-</table>
-</div>
-
-<div id="eventTableWrap">
-<table id="eventTable">
-<thead><tr><th>Event</th><th>Time</th><th>Temp</th><th>Gas</th></tr></thead>
-<tbody></tbody>
-</table>
-</div>
+<div id="phaseText">Phase: waiting...</div>
 
 <div id="panel">
+
 <div id="time">0:00</div>
 
 <label>開始温度</label>
@@ -64,7 +57,7 @@ thead{position:sticky;top:0;background:#000;color:#fff}
 <label>Gas</label>
 <div class="row">
 <button id="gasDown">−</button>
-<div id="gasLabel" style="text-align:center;font-size:20px">2.5</div>
+<div id="gasLabel" style="text-align:center;font-size:20px;line-height:48px">2.5</div>
 <button id="gasUp">＋</button>
 </div>
 
@@ -74,28 +67,67 @@ thead{position:sticky;top:0;background:#000;color:#fff}
 </div>
 
 <button id="chargeBtn">Charge</button>
-<button id="dryBtn">Dry End</button>
-<button id="fcBtn">1st Crack</button>
+<button id="dryBtn">Dry End（長押し）</button>
+<button id="fcBtn">1st Crack（長押し）</button>
 <button id="dropBtn">DROP</button>
 
 <button id="csvBtn">CSV Export</button>
 <input id="loadCsv" type="file" accept=".csv">
+
+<select id="historySelect"><option value="">履歴</option></select>
+
 </div>
 </div>
 
 <script>
 Chart.register(window['chartjs-plugin-annotation']);
-const fmt=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
-const secToMinSec=fmt;
 
-/* ===== 状態 ===== */
+// ===== iPad 判定 =====
+const isIPad = navigator.userAgent.includes("iPad") || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
+document.body.classList.add(isIPad?"ipad":"iphone");
+
+// ===== util =====
+const fmt=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
+
+// ===== 状態 =====
 let startTime=null,endTime=null,timer=null;
-let temp=150,gas=2.5,startTemp=150;
+let temp=150,gas=2.5;
 const tempData=[],gasData=[],rorData=[];
 let chargeTime=null,dryTime=null,fcTime=null,dropTime=null;
-const nowSec=()=>endTime??Math.floor((Date.now()-startTime)/1000);
 
-/* ===== Phase Ratio ===== */
+const nowSec=()=>endTime ?? Math.floor((Date.now()-startTime)/1000);
+
+// ===== Chart =====
+const chart=new Chart(chartWrap.firstChild,{
+ type:"line",
+ data:{datasets:[
+  {label:"Temp",data:[],borderColor:"red",borderWidth:3,tension:.3,pointRadius:0},
+  {label:"RoR",data:[],yAxisID:"yRoR",borderColor:"blue",borderWidth:2,pointRadius:0},
+  {label:"Gas",data:[],yAxisID:"yGas",borderColor:"green",borderDash:[4,4],pointRadius:0}
+ ]},
+ options:{
+  animation:false,
+  scales:{
+   x:{type:"linear",ticks:{callback:v=>fmt(v)}},
+   y:{min:0,max:260},
+   yRoR:{position:"right",min:0,max:40,grid:{drawOnChartArea:false}},
+   yGas:{position:"right",min:0,max:5,offset:true,grid:{drawOnChartArea:false}}
+  },
+  plugins:{annotation:{annotations:{}}}
+ }
+});
+
+// ===== RoR =====
+function calcRoR(){
+ rorData.length=0;
+ for(let i=1;i<tempData.length;i++){
+  const p=tempData[i-1],c=tempData[i];
+  const dt=c.x-p.x;if(dt<=0)continue;
+  rorData.push({x:c.x,y:+((c.y-p.y)*60/dt).toFixed(1)});
+ }
+}
+
+// ===== フェーズ =====
 function calcPhaseRatio(){
  if(!chargeTime||!dryTime||!fcTime||!dropTime) return null;
  const drying=dryTime-chargeTime;
@@ -104,90 +136,57 @@ function calcPhaseRatio(){
  const total=dropTime-chargeTime;
  const pct=n=>(n/total*100).toFixed(1);
  return {
-  dryingPct:pct(drying),maillardPct:pct(maillard),devPct:pct(dev),
-  dryingTime:secToMinSec(drying),
-  maillardTime:secToMinSec(maillard),
-  devTime:secToMinSec(dev),
-  totalTime:secToMinSec(total)
+  drying,maillard,dev,
+  dryingTime:fmt(drying),
+  maillardTime:fmt(maillard),
+  devTime:fmt(dev),
+  dryingPct:pct(drying),
+  maillardPct:pct(maillard),
+  devPct:pct(dev)
  };
 }
 
-/* ===== Chart ===== */
-const chart=new Chart(document.getElementById("chart"),{
- type:"line",
- data:{datasets:[
-  {label:"Temp",data:[],borderColor:"red",borderWidth:3,tension:.3,pointRadius:0},
-  {label:"RoR",data:[],yAxisID:"y2",borderColor:"blue",borderWidth:2,pointRadius:0},
-  {label:"Gas",data:[],yAxisID:"y3",borderColor:"green",borderDash:[4,4],pointRadius:0}
- ]},
- options:{
-  animation:false,
-  scales:{
-   x:{type:"linear",ticks:{callback:v=>`${Math.floor(v/60)}:00`}},
-   y:{min:0,max:260},
-   y2:{position:"right",min:0,max:40,grid:{drawOnChartArea:false}},
-   y3:{position:"right",min:0,max:5,grid:{drawOnChartArea:false}}
-  }
- }
-});
-
-/* ===== RoR ===== */
-function calcRoR(){
- rorData.length=0;
- for(let i=1;i<tempData.length;i++){
-  const p=tempData[i-1],c=tempData[i];
-  const dt=c.x-p.x;if(dt<=0)continue;
-  rorData.push({x:c.x,y:+((c.y-p.y)*(60/dt)).toFixed(1)});
- }
-}
-
-/* ===== Log Table ===== */
-function updateLogTable(){
- const tb=document.querySelector("#logTable tbody");
- tb.innerHTML="";
- for(let s=0;s<=nowSec();s+=60){
-  const t=[...tempData].reverse().find(d=>d.x<=s);
-  const g=[...gasData].reverse().find(d=>d.x<=s);
-  const r=[...rorData].reverse().find(d=>d.x<=s);
-  const tr=document.createElement("tr");
-  tr.innerHTML=`<td>${fmt(s)}</td><td>${t?t.y:""}</td><td>${g?g.y:""}</td><td>${r?r.y:""}</td>`;
-  tb.appendChild(tr);
- }
-}
-
-/* ===== Event Log ===== */
-function addEvent(name){
- const tb=document.querySelector("#eventTable tbody");
- const tr=document.createElement("tr");
- tr.innerHTML=`<td>${name}</td><td>${fmt(nowSec())}</td><td>${temp}</td><td>${gas}</td>`;
- tb.appendChild(tr);
-}
-
-/* ===== Draw ===== */
+// ===== 描画 =====
 function draw(){
  if(!startTime)return;
  const t=nowSec();
  time.textContent=fmt(t);
- chart.options.scales.x.max=Math.max(600,t+10);
 
  calcRoR();
  chart.data.datasets[0].data=tempData;
  chart.data.datasets[1].data=rorData;
  chart.data.datasets[2].data=gasData;
 
- updateLogTable();
+ chart.options.scales.x.max=Math.max(600,t+10);
+
+ const ann=chart.options.plugins.annotation.annotations={};
+ const addLine=(k,time,label,color)=>{
+  if(time==null)return;
+  ann[k]={type:"line",xMin:time,xMax:time,borderColor:color,borderWidth:2,label:{display:true,content:label}};
+ };
+ addLine("charge",chargeTime,"Charge","blue");
+ addLine("dry",dryTime,"Dry","orange");
+ addLine("fc",fcTime,"1C","red");
+ addLine("drop",dropTime,"Drop","black");
+
+ const ratio=calcPhaseRatio();
+ if(ratio){
+  phaseText.innerHTML=
+   `Dry ${ratio.dryingTime} (${ratio.dryingPct}%) | 
+    Maillard ${ratio.maillardTime} (${ratio.maillardPct}%) | 
+    Dev ${ratio.devTime} (${ratio.devPct}%)`;
+ }
+
  chart.update();
 }
 
-/* ===== Controls ===== */
+// ===== 操作 =====
 startBtn.onclick=()=>{
- startTemp=parseInt(startTempInput.value)||150;
- temp=startTemp;
- startTime=Date.now();endTime=null;
+ startTime=Date.now(); endTime=null;
  tempData.length=gasData.length=rorData.length=0;
  chargeTime=dryTime=fcTime=dropTime=null;
- document.querySelector("#eventTable tbody").innerHTML="";
- tempData.push({x:0,y:startTemp});
+ temp=parseInt(startTempInput.value)||150;
+ tempData.push({x:0,y:temp});
  gasData.push({x:0,y:gas});
  clearInterval(timer);
  timer=setInterval(draw,1000);
@@ -195,91 +194,113 @@ startBtn.onclick=()=>{
 };
 
 tempSet.onclick=()=>{
- temp=parseInt(tempInput.value);
+ temp=parseInt(tempInput.value)||temp;
  tempData.push({x:nowSec(),y:temp});
  draw();
 };
 
 const setGas=v=>{
- gas=Math.max(0,Math.min(5,Number(v.toFixed(1))));
- gasLabel.textContent=gas;gasInput.value=gas;
+ gas=Math.max(0,Math.min(5,v));
+ gasLabel.textContent=gas.toFixed(1);
+ gasInput.value=gas.toFixed(1);
  gasData.push({x:nowSec(),y:gas});
- addEvent("Gas");
  draw();
 };
 gasUp.onclick=()=>setGas(gas+0.1);
 gasDown.onclick=()=>setGas(gas-0.1);
 gasSet.onclick=()=>setGas(parseFloat(gasInput.value));
 
-chargeBtn.onclick=()=>{chargeTime=nowSec();addEvent("Charge");};
-dryBtn.onclick=()=>{dryTime=nowSec();addEvent("Dry End");};
-fcBtn.onclick=()=>{fcTime=nowSec();addEvent("1st Crack");};
+let hold=null;
+const holdStart=f=>hold=setTimeout(f,600);
+const holdCancel=()=>clearTimeout(hold);
 
+dryBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>dryTime=nowSec());};
+fcBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>fcTime=nowSec());};
+[dryBtn,fcBtn].forEach(b=>b.onpointerup=holdCancel);
+
+chargeBtn.onclick=()=>chargeTime=nowSec();
 dropBtn.onclick=()=>{
- dropTime=nowSec();endTime=dropTime;
- addEvent("Drop");clearInterval(timer);draw();
-
- const r=calcPhaseRatio();
- if(r){
-  phaseText.innerHTML=`
-  Drying: ${r.dryingPct}% (${r.dryingTime})<br>
-  Maillard: ${r.maillardPct}% (${r.maillardTime})<br>
-  Development: ${r.devPct}% (${r.devTime})<br>
-  Total: ${r.totalTime}`;
- }
+ dropTime=nowSec();
+ endTime=dropTime;
+ clearInterval(timer);
+ draw();
+ saveHistory();
 };
 
-/* ===== CSV Export ===== */
+// ===== 履歴保存 =====
+function saveHistory(){
+ const history=JSON.parse(localStorage.getItem("roastHistory")||"[]");
+ history.push({tempData,gasData,rorData,chargeTime,dryTime,fcTime,dropTime});
+ localStorage.setItem("roastHistory",JSON.stringify(history));
+ updateHistory();
+}
+function updateHistory(){
+ const h=JSON.parse(localStorage.getItem("roastHistory")||"[]");
+ historySelect.innerHTML='<option>履歴</option>';
+ h.forEach((r,i)=>{
+  const o=document.createElement("option");
+  o.value=i;o.textContent=`Roast ${i+1}`;
+  historySelect.appendChild(o);
+ });
+}
+historySelect.onchange=()=>{
+ const h=JSON.parse(localStorage.getItem("roastHistory"));
+ const r=h[historySelect.value];
+ Object.assign(tempData,r.tempData);
+ Object.assign(gasData,r.gasData);
+ Object.assign(rorData,r.rorData);
+ chargeTime=r.chargeTime;dryTime=r.dryTime;fcTime=r.fcTime;dropTime=r.dropTime;
+ startTime=Date.now();
+ draw();
+};
+
+// ===== CSV Export =====
 csvBtn.onclick=()=>{
- let csv=["# Roast Logger CSV"];
- const r=calcPhaseRatio();
- if(r){
-  csv.push(`# DryingTime,${r.dryingTime}`);
-  csv.push(`# MaillardTime,${r.maillardTime}`);
-  csv.push(`# DevelopmentTime,${r.devTime}`);
-  csv.push(`# TotalTime,${r.totalTime}`);
-  csv.push(`# DryingRate,${r.dryingPct}%`);
-  csv.push(`# MaillardRate,${r.maillardPct}%`);
-  csv.push(`# DevelopmentRate,${r.devPct}%`);
+ let csv=["# Roast Logger"];
+ const ratio=calcPhaseRatio();
+ if(ratio){
+  csv.push(`# DryingTime,${ratio.dryingTime}`);
+  csv.push(`# MaillardTime,${ratio.maillardTime}`);
+  csv.push(`# DevTime,${ratio.devTime}`);
+  csv.push(`# DryingRate,${ratio.dryingPct}%`);
+  csv.push(`# MaillardRate,${ratio.maillardPct}%`);
+  csv.push(`# DevRate,${ratio.devPct}%`);
  }
  csv.push("Time,Temp,Gas,RoR");
- for(let i=0;i<tempData.length;i++){
-  const t=tempData[i];
+ tempData.forEach(t=>{
   const g=gasData.find(d=>d.x==t.x);
-  const ror=rorData.find(d=>d.x==t.x);
-  csv.push(`${fmt(t.x)},${t.y},${g?g.y:""},${ror?ror.y:""}`);
- }
+  const r=rorData.find(d=>d.x==t.x);
+  csv.push(`${fmt(t.x)},${t.y},${g?g.y:""},${r?r.y:""}`);
+ });
  const blob=new Blob([csv.join("\n")],{type:"text/csv"});
+ const url=URL.createObjectURL(blob);
  const a=document.createElement("a");
- a.href=URL.createObjectURL(blob);
- a.download=`roast_${Date.now()}.csv`;
- a.click();
+ a.href=url;a.download="roast.csv";a.click();
 };
 
-/* ===== CSV Import ===== */
+// ===== CSV Import =====
 loadCsv.onchange=e=>{
- const file=e.target.files[0]; if(!file)return;
+ const file=e.target.files[0];
  const reader=new FileReader();
- reader.onload=ev=>{
-  const lines=ev.target.result.split("\n");
+ reader.onload=()=>{
   tempData.length=gasData.length=rorData.length=0;
-  for(let l of lines){
-   if(!l||l.startsWith("#")||l.startsWith("Time"))continue;
-   const [time,t,g,r]=l.split(",");
+  reader.result.split("\n").forEach(l=>{
+   if(l.startsWith("#")||l.startsWith("Time"))return;
+   const [time,temp,gas,ror]=l.split(",");
+   if(!time)return;
    const [m,s]=time.split(":").map(Number);
-   const sec=m*60+s;
-   if(t)tempData.push({x:sec,y:+t});
-   if(g)gasData.push({x:sec,y:+g});
-   if(r)rorData.push({x:sec,y:+r});
-  }
-  chart.data.datasets[0].data=tempData;
-  chart.data.datasets[1].data=rorData;
-  chart.data.datasets[2].data=gasData;
-  chart.update();
-  alert("CSV Loaded");
+   const t=m*60+s;
+   if(temp)tempData.push({x:t,y:+temp});
+   if(gas)gasData.push({x:t,y:+gas});
+   if(ror)rorData.push({x:t,y:+ror});
+  });
+  startTime=Date.now();
+  draw();
  };
  reader.readAsText(file);
 };
+
+updateHistory();
 </script>
 </body>
 </html>
