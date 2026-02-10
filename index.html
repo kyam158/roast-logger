@@ -31,6 +31,10 @@ th,td{border:1px solid #444;padding:2px;text-align:center}
 thead{position:sticky;top:0;background:#000;color:#fff}
 
 #bottomSpacer{height:120px}
+
+/* small layout for history controls inline */
+.history-controls{display:flex;gap:6px;align-items:center}
+.history-controls>*{flex:1}
 </style>
 </head>
 
@@ -96,7 +100,17 @@ thead{position:sticky;top:0;background:#000;color:#fff}
 
 <button id="csvBtn">CSV Export</button>
 <input id="loadCsv" type="file" accept=".csv">
-<select id="historySelect"><option value="">履歴</option></select>
+
+<!-- 履歴セレクト + 履歴操作 -->
+<div class="history-controls">
+  <select id="historySelect"><option value="">履歴</option></select>
+  <button id="exportHistoryBtn">Export Selected</button>
+</div>
+<div class="history-controls">
+  <input id="historyName" placeholder="履歴名 (編集)" />
+  <button id="renameHistoryBtn">Rename</button>
+  <button id="deleteHistoryBtn">Delete Selected</button>
+</div>
 
 <h3>Green Bean Info</h3>
 <label>日付</label><input id="metaDate" type="date">
@@ -111,9 +125,10 @@ thead{position:sticky;top:0;background:#000;color:#fff}
 
 <script>
 Chart.register(window['chartjs-plugin-annotation']);
+
+/* utils */
 const fmt = s => `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
 const secToMinSec = fmt;
-
 function minSecToSec(str){
  if(!str) return null;
  const v = (""+str).trim();
@@ -124,42 +139,103 @@ function minSecToSec(str){
  return m*60 + s;
 }
 
-// ===== 状態 =====
+/* state */
 let startTime=null,endTime=null,timer=null;
 let temp=150,gas=2.5,air=0;
 const tempData=[],gasData=[],airData=[],rorData=[];
 let tpTime=null,dryTime=null,fcTime=null,dropTime=null;
 
-// logs
-const minuteLog = []; // {min,time,temp,gas,air,ror}
-const eventLog = []; // {name,t,temp,gas,air}
+const minuteLog = [];
+const eventLog = [];
 let lastMinuteLogged = -1;
-
 const nowSec = ()=> endTime ?? Math.floor((Date.now()-startTime)/1000);
 
-// ===== Chart =====
+/* Chart plugin: draw big phase info on canvas */
+const phaseOverlayPlugin = {
+  id: 'phaseOverlay',
+  afterDraw(chart){
+    // only draw when we have a chart canvas
+    const ctx = chart.ctx;
+    const area = chart.chartArea;
+    // calculate ratio using current globals
+    const ratio = (function(){
+      if(tpTime==null || dryTime==null || fcTime==null || dropTime==null) return null;
+      const drying = dryTime - tpTime;
+      const maillard = fcTime - dryTime;
+      const dev = dropTime - fcTime;
+      const total = dropTime - tpTime;
+      if(total<=0) return null;
+      return {
+        drying, maillard, dev,
+        dryingPct: (drying/total*100).toFixed(1),
+        maillardPct: (maillard/total*100).toFixed(1),
+        devPct: (dev/total*100).toFixed(1),
+        devTime: secToMinSec(dev)
+      };
+    })();
+    ctx.save();
+    ctx.font = "bold 16px sans-serif";
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.textBaseline = "top";
+
+    if(ratio){
+      // draw a pill background
+      const text = `Dry ${ratio.dryingPct}%  |  Mail ${ratio.maillardPct}%  |  Dev ${ratio.devPct}% (${ratio.devTime})`;
+      const x = area.left + 8;
+      const y = area.top + 8;
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      const w = ctx.measureText(text).width + 18;
+      ctx.fillRect(x-6, y-6, w, 34);
+      ctx.fillStyle = "#111";
+      ctx.font = "bold 13px sans-serif";
+      ctx.fillText(text, x, y);
+    } else {
+      // If not complete, show partial markers (TP/Dry/1C)
+      const parts = [];
+      if(tpTime) parts.push(`TP ${secToMinSec(tpTime)}`);
+      if(dryTime) parts.push(`Dry ${secToMinSec(dryTime)}`);
+      if(fcTime) parts.push(`1C ${secToMinSec(fcTime)}`);
+      if(dropTime) parts.push(`Drop ${secToMinSec(dropTime)}`);
+      if(parts.length){
+        const text = parts.join(" | ");
+        const x = area.left + 8;
+        const y = area.top + 8;
+        ctx.fillStyle = "rgba(255,255,255,0.85)";
+        const w = ctx.measureText(text).width + 18;
+        ctx.fillRect(x-6, y-6, w, 24);
+        ctx.fillStyle = "#111";
+        ctx.font = "12px sans-serif";
+        ctx.fillText(text, x, y);
+      }
+    }
+    ctx.restore();
+  }
+};
+
+/* Chart */
 const chart = new Chart(document.getElementById("chart"),{
- type:"line",
- data:{datasets:[
-  {label:"Temp",data:[],borderColor:"red",borderWidth:2,pointRadius:0},
-  {label:"RoR",data:[],yAxisID:"yRoR",borderColor:"blue",borderWidth:2,pointRadius:0},
-  {label:"Gas",data:[],yAxisID:"yGas",borderColor:"green",borderDash:[4,4],pointRadius:0},
-  {label:"Air",data:[],yAxisID:"yAir",borderColor:"cyan",borderDash:[2,2],pointRadius:0}
- ]},
- options:{
-  animation:false,
-  scales:{
-   x:{type:"linear",ticks:{callback:v=>fmt(v)}},
-   y:{min:0,max:260},
-   yRoR:{position:"right",min:0,max:40},
-   yGas:{position:"right",min:0,max:5,offset:true},
-   yAir:{position:"right",min:0,max:10,offset:true}
-  },
-  plugins:{annotation:{annotations:{}}}
- }
+  plugins:[phaseOverlayPlugin],
+  type:"line",
+  data:{datasets:[
+    {label:"Temp",data:[],borderColor:"red",borderWidth:2,pointRadius:0},
+    {label:"RoR",data:[],yAxisID:"yRoR",borderColor:"blue",borderWidth:2,pointRadius:0},
+    {label:"Gas",data:[],yAxisID:"yGas",borderColor:"green",borderDash:[4,4],pointRadius:0},
+    {label:"Air",data:[],yAxisID:"yAir",borderColor:"cyan",borderDash:[2,2],pointRadius:0}
+  ]},
+  options:{
+    animation:false,
+    scales:{
+      x:{type:"linear",ticks:{callback:v=>fmt(v)}},
+      y:{min:0,max:260},
+      yRoR:{position:"right",min:0,max:40},
+      yGas:{position:"right",min:0,max:5,offset:true},
+      yAir:{position:"right",min:0,max:10,offset:true}
+    },
+    plugins:{annotation:{annotations:{}}}
+  }
 });
 
-// ===== RoR =====
+/* RoR calc */
 function calcRoR(){
  rorData.length=0;
  for(let i=1;i<tempData.length;i++){
@@ -169,10 +245,9 @@ function calcRoR(){
  }
 }
 
-// ===== イベントログ追加 =====
+/* Event log */
 function addEventLog(name){
  const t = nowSec();
- // nearest recorded values at or before t
  const tempRec = [...tempData].reverse().find(d=>d.x<=t);
  const gasRec = [...gasData].reverse().find(d=>d.x<=t);
  const airRec = [...airData].reverse().find(d=>d.x<=t);
@@ -184,20 +259,19 @@ function addEventLog(name){
   air: airRec ? Number(airRec.y) : (air? Number(air) : "")
  };
  eventLog.push(JSON.parse(JSON.stringify(rec)));
- // append to event table
  const tbody = document.querySelector("#eventTable tbody");
  const tr = document.createElement("tr");
  tr.innerHTML = `<td>${rec.name}</td><td>${secToMinSec(rec.t)}</td><td>${rec.temp!==""?rec.temp:""}</td><td>${rec.gas!==""?rec.gas:""}</td><td>${rec.air!==""?rec.air:""}</td>`;
  tbody.appendChild(tr);
 }
 
-// ===== 1分ログ更新 =====
+/* Minute log */
 function updateMinuteLogIfNeeded(){
  if(!startTime) return;
  const s = nowSec();
  const min = Math.floor(s/60);
  if(min <= lastMinuteLogged) return;
- for(let m = lastMinuteLogged+1; m<=min; m++){
+ for(let m=lastMinuteLogged+1; m<=min; m++){
    const sec = m*60;
    const tRec = [...tempData].reverse().find(d=>d.x<=sec);
    const gRec = [...gasData].reverse().find(d=>d.x<=sec);
@@ -212,7 +286,6 @@ function updateMinuteLogIfNeeded(){
      ror: rRec? rRec.y.toFixed(1) : ""
    };
    minuteLog.push(JSON.parse(JSON.stringify(rec)));
-   // append to table
    const tbody = document.querySelector("#logTable tbody");
    const tr = document.createElement("tr");
    tr.innerHTML = `<td>${rec.time}</td><td>${rec.temp}</td><td>${rec.gas}</td><td>${rec.air}</td><td>${rec.ror}</td>`;
@@ -221,16 +294,15 @@ function updateMinuteLogIfNeeded(){
  lastMinuteLogged = min;
 }
 
-// ===== フェーズ比率 =====
-// NOTE: per your request phases are: TP -> Dry End, Dry End -> 1C, 1C -> Drop
+/* Phase ratio */
 function calcPhaseRatio(){
  if(tpTime==null || dryTime==null || fcTime==null || dropTime==null) return null;
  const drying = dryTime - tpTime;
  const maillard = fcTime - dryTime;
  const dev = dropTime - fcTime;
  const total = dropTime - tpTime;
- if(total <= 0) return null;
- const pct = n => (n / total * 100).toFixed(1);
+ if(total<=0) return null;
+ const pct = n => (n/total*100).toFixed(1);
  return {
   drying, maillard, dev,
   dryingTime: fmt(drying),
@@ -242,19 +314,16 @@ function calcPhaseRatio(){
  };
 }
 
-// ===== 描画 =====
+/* draw */
 function draw(){
  if(!startTime) return;
  const t = nowSec();
  document.getElementById("time").textContent = fmt(t);
-
  calcRoR();
-
  chart.data.datasets[0].data = tempData;
  chart.data.datasets[1].data = rorData;
  chart.data.datasets[2].data = gasData;
  chart.data.datasets[3].data = airData;
-
  chart.options.scales.x.max = Math.max(600, t+10);
 
  // annotations
@@ -265,14 +334,12 @@ function draw(){
  addAnn("fc", fcTime, "1C", "red");
  addAnn("drop", dropTime, "Drop", "black");
 
- // update minute log and phase text
  updateMinuteLogIfNeeded();
  const ratio = calcPhaseRatio();
  if(ratio){
   document.getElementById("phaseText").innerHTML =
    `Dry ${ratio.dryingTime} (${ratio.dryingPct}%) | Maillard ${ratio.maillardTime} (${ratio.maillardPct}%) | Dev ${ratio.devTime} (${ratio.devPct}%)`;
  } else {
-  // partial info
   const parts = [];
   if(tpTime) parts.push(`TP ${secToMinSec(tpTime)}`);
   if(dryTime) parts.push(`Dry ${secToMinSec(dryTime)}`);
@@ -284,17 +351,16 @@ function draw(){
  chart.update();
 }
 
-// ===== 操作 =====
+/* Controls */
 document.getElementById("startBtn").onclick = () => {
  startTime = Date.now(); endTime = null;
  tempData.length = gasData.length = airData.length = rorData.length = 0;
- minuteLog.length = 0; eventLog.length = 0; lastMinuteLogged = -1;
+ minuteLog.length = eventLog.length = 0; lastMinuteLogged = -1;
  tpTime = dryTime = fcTime = dropTime = null;
  temp = +document.getElementById("startTempInput").value || 150;
  tempData.push({x:0,y:temp});
  gasData.push({x:0,y:gas});
  airData.push({x:0,y:air});
- // clear tables
  document.querySelector("#logTable tbody").innerHTML = "";
  document.querySelector("#eventTable tbody").innerHTML = "";
  clearInterval(timer);
@@ -308,7 +374,6 @@ document.getElementById("tempSet").onclick = () => {
  draw();
 };
 
-// Gas controls
 const setGas = v => {
  gas = Math.max(0, Math.min(5, Number((v).toFixed(1))));
  document.getElementById("gasLabel").textContent = gas.toFixed(1);
@@ -324,7 +389,6 @@ document.getElementById("gasSet").onclick = ()=> {
  if(!isNaN(v)) setGas(v);
 };
 
-// Air controls
 const setAir = v => {
  air = Math.max(0, Number((v).toFixed(1)));
  document.getElementById("airLabel").textContent = air.toFixed(1);
@@ -340,11 +404,10 @@ document.getElementById("airSet").onclick = ()=> {
  if(!isNaN(v)) setAir(v);
 };
 
-// long-press handlers for Dry End and 1st Crack
+// long-press Dry/1C
 let hold = null;
 const holdStart = f => hold = setTimeout(f, 600);
-const holdCancel = () => { if(hold) { clearTimeout(hold); hold = null; } };
-
+const holdCancel = () => { if(hold){ clearTimeout(hold); hold=null; } };
 const dryBtn = document.getElementById("dryBtn");
 const fcBtn = document.getElementById("fcBtn");
 dryBtn.onpointerdown = e => { e.preventDefault(); holdStart(()=>{ dryTime = nowSec(); addEventLog("Dry End"); draw(); }); };
@@ -361,7 +424,7 @@ document.getElementById("dropBtn").onclick = () => {
  saveHistory();
 };
 
-// ===== 履歴保存 / 復元 =====
+/* History: save/restore/delete/rename/export */
 function saveHistory(){
  const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
  const snapshot = {
@@ -380,6 +443,7 @@ function saveHistory(){
    process: document.getElementById("metaProcess").value || "",
    altitude: document.getElementById("metaAltitude").value || ""
   },
+  title: document.getElementById("historyName").value || "",
   savedAt: new Date().toISOString()
  };
  h.push(snapshot);
@@ -394,8 +458,7 @@ function updateHistory(){
  h.forEach((r,i)=>{
   const o = document.createElement("option");
   o.value = i;
-  const meta = r.meta || {};
-  o.textContent = `Roast ${i+1} ${meta.date? "(" + meta.date + ")" : ""}`;
+  o.textContent = r.title ? `Roast ${i+1} - ${r.title}` : `Roast ${i+1} (${new Date(r.savedAt).toLocaleString()})`;
   sel.appendChild(o);
  });
 }
@@ -406,32 +469,28 @@ document.getElementById("historySelect").onchange = () => {
  const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
  const r = h[idx];
  if(!r) return;
- // restore arrays by clearing and pushing
+ // restore data
  tempData.length = 0; gasData.length = 0; airData.length = 0; rorData.length = 0;
- r.tempData.forEach(d => tempData.push(d));
- r.gasData.forEach(d => gasData.push(d));
- r.airData.forEach(d => airData.push(d));
- r.rorData.forEach(d => rorData.push(d));
- // restore tables
+ r.tempData.forEach(d=>tempData.push(d));
+ r.gasData.forEach(d=>gasData.push(d));
+ r.airData.forEach(d=>airData.push(d));
+ r.rorData.forEach(d=>rorData.push(d));
+ // restore logs & tables
  minuteLog.length = 0; eventLog.length = 0;
  document.querySelector("#logTable tbody").innerHTML = "";
  document.querySelector("#eventTable tbody").innerHTML = "";
- if(r.minuteLog){
-   r.minuteLog.forEach(m=>{
-     minuteLog.push(m);
-     const tr = document.createElement("tr");
-     tr.innerHTML = `<td>${m.time}</td><td>${m.temp}</td><td>${m.gas}</td><td>${m.air}</td><td>${m.ror}</td>`;
-     document.querySelector("#logTable tbody").appendChild(tr);
-   });
- }
- if(r.eventLog){
-   r.eventLog.forEach(ev=>{
-     eventLog.push(ev);
-     const tr = document.createElement("tr");
-     tr.innerHTML = `<td>${ev.name}</td><td>${secToMinSec(ev.t)}</td><td>${ev.temp}</td><td>${ev.gas}</td><td>${ev.air}</td>`;
-     document.querySelector("#eventTable tbody").appendChild(tr);
-   });
- }
+ if(r.minuteLog) r.minuteLog.forEach(m=>{
+   minuteLog.push(m);
+   const tr = document.createElement("tr");
+   tr.innerHTML = `<td>${m.time}</td><td>${m.temp}</td><td>${m.gas}</td><td>${m.air}</td><td>${m.ror}</td>`;
+   document.querySelector("#logTable tbody").appendChild(tr);
+ });
+ if(r.eventLog) r.eventLog.forEach(ev=>{
+   eventLog.push(ev);
+   const tr = document.createElement("tr");
+   tr.innerHTML = `<td>${ev.name}</td><td>${secToMinSec(ev.t)}</td><td>${ev.temp}</td><td>${ev.gas}</td><td>${ev.air}</td>`;
+   document.querySelector("#eventTable tbody").appendChild(tr);
+ });
  // restore meta
  if(r.meta){
   document.getElementById("metaDate").value = r.meta.date || "";
@@ -441,15 +500,108 @@ document.getElementById("historySelect").onchange = () => {
   document.getElementById("metaProcess").value = r.meta.process || "";
   document.getElementById("metaAltitude").value = r.meta.altitude || "";
  }
+ document.getElementById("historyName").value = r.title || "";
  tpTime = r.tpTime; dryTime = r.dryTime; fcTime = r.fcTime; dropTime = r.dropTime;
- // set times so draw will treat this as finished if dropTime present
  startTime = Date.now();
  if(dropTime) endTime = dropTime; else endTime = null;
- lastMinuteLogged = minuteLog.length? minuteLog[minuteLog.length-1].min : -1;
+ lastMinuteLogged = minuteLog.length ? minuteLog[minuteLog.length-1].min : -1;
  draw();
 };
 
-// ===== CSV Export =====
+// Export selected snapshot
+document.getElementById("exportHistoryBtn").onclick = () => {
+ const idx = document.getElementById("historySelect").value;
+ if(idx === "") return alert("履歴を選んでください");
+ const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+ const s = h[idx];
+ if(!s) return alert("履歴が見つかりません");
+ exportSnapshot(s);
+};
+
+function exportSnapshot(s){
+ let csv = [];
+ csv.push("# Roast Logger CSV (export)");
+ csv.push("# SavedAt," + (s.savedAt||""));
+ if(s.meta){
+  csv.push(`# Date,${s.meta.date||""}`);
+  csv.push(`# Country,${s.meta.country||""}`);
+  csv.push(`# Farm,${s.meta.farm||""}`);
+  csv.push(`# Variety,${s.meta.variety||""}`);
+  csv.push(`# Process,${s.meta.process||""}`);
+  csv.push(`# Altitude,${s.meta.altitude||""}`);
+ }
+ if(s.tpTime!=null) csv.push(`# TP,${secToMinSec(s.tpTime)}`);
+ if(s.dryTime!=null) csv.push(`# DryEnd,${secToMinSec(s.dryTime)}`);
+ if(s.fcTime!=null) csv.push(`# FirstCrack,${secToMinSec(s.fcTime)}`);
+ if(s.dropTime!=null) csv.push(`# Drop,${secToMinSec(s.dropTime)}`);
+
+ csv.push("# Events");
+ csv.push("Event,Time,Temp,Gas,Air");
+ (s.eventLog||[]).forEach(ev=>{
+  csv.push(`${ev.name},${secToMinSec(ev.t)},${ev.temp},${ev.gas},${ev.air}`);
+ });
+ csv.push("# MinuteLog");
+ csv.push("Time,Temp,Gas,Air,RoR");
+ (s.minuteLog||[]).forEach(m=>{
+  csv.push(`${m.time},${m.temp},${m.gas},${m.air},${m.ror}`);
+ });
+ csv.push("# TimeSeries");
+ csv.push("Time,Temp,Gas,Air,RoR");
+ const map = {};
+ (s.tempData||[]).forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].t = d.y; });
+ (s.gasData||[]).forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].g = d.y; });
+ (s.airData||[]).forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].a = d.y; });
+ (s.rorData||[]).forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].r = d.y; });
+ Object.keys(map).map(Number).sort((a,b)=>a-b).forEach(k=>{
+  const row = map[k];
+  csv.push(`${secToMinSec(k)},${row.t??""},${row.g??""},${row.a??""},${row.r??""}`);
+ });
+ const blob = new Blob([csv.join("\n")], {type:"text/csv;charset=utf-8;"});
+ const url = URL.createObjectURL(blob);
+ const a = document.createElement("a");
+ a.href = url;
+ const safe = s.title ? s.title.replace(/[\\/:*?"<>| ]+/g,"_") : `roast_${Date.now()}`;
+ a.download = `${safe}.csv`;
+ document.body.appendChild(a); a.click(); document.body.removeChild(a);
+ URL.revokeObjectURL(url);
+}
+
+// Delete selected snapshot
+document.getElementById("deleteHistoryBtn").onclick = () => {
+ const idx = document.getElementById("historySelect").value;
+ if(idx === "") return alert("削除する履歴を選んでください");
+ if(!confirm("選択された履歴を削除しますか？")) return;
+ const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+ h.splice(idx,1);
+ localStorage.setItem("roastHistory", JSON.stringify(h));
+ updateHistory();
+ document.getElementById("historySelect").value = "";
+ document.getElementById("historyName").value = "";
+};
+
+// Rename selected snapshot (set title)
+document.getElementById("renameHistoryBtn").onclick = () => {
+ const idx = document.getElementById("historySelect").value;
+ if(idx === "") return alert("編集する履歴を選んでください");
+ const newName = document.getElementById("historyName").value.trim();
+ const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+ if(!h[idx]) return alert("履歴が見つかりません");
+ h[idx].title = newName;
+ localStorage.setItem("roastHistory", JSON.stringify(h));
+ updateHistory();
+ document.getElementById("historySelect").value = idx; // keep selection
+};
+
+// Save current snapshot quickly on demand (Ctrl-ish)
+document.addEventListener("keydown", e => {
+ if((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==="s"){
+   e.preventDefault();
+   saveHistory();
+   alert("Current roast saved to history");
+ }
+});
+
+// CSV Export (current)
 document.getElementById("csvBtn").onclick = () => {
  let csv = [];
  csv.push("# Roast Logger CSV");
@@ -461,7 +613,6 @@ document.getElementById("csvBtn").onclick = () => {
  csv.push(`# Variety,${document.getElementById("metaVariety").value || ""}`);
  csv.push(`# Process,${document.getElementById("metaProcess").value || ""}`);
  csv.push(`# Altitude,${document.getElementById("metaAltitude").value || ""}`);
- // phase times
  if(tpTime!=null) csv.push(`# TP,${secToMinSec(tpTime)}`);
  if(dryTime!=null) csv.push(`# DryEnd,${secToMinSec(dryTime)}`);
  if(fcTime!=null) csv.push(`# FirstCrack,${secToMinSec(fcTime)}`);
@@ -475,19 +626,16 @@ document.getElementById("csvBtn").onclick = () => {
   csv.push(`# MaillardRate,${ratio.maillardPct}%`);
   csv.push(`# DevRate,${ratio.devPct}%`);
  }
- // events
  csv.push("# Events");
  csv.push("Event,Time,Temp,Gas,Air");
  eventLog.forEach(ev=>{
   csv.push(`${ev.name},${secToMinSec(ev.t)},${ev.temp},${ev.gas},${ev.air}`);
  });
- // minute log
  csv.push("# MinuteLog");
  csv.push("Time,Temp,Gas,Air,RoR");
  minuteLog.forEach(m=>{
   csv.push(`${m.time},${m.temp},${m.gas},${m.air},${m.ror}`);
  });
- // timeseries
  csv.push("# TimeSeries");
  csv.push("Time,Temp,Gas,Air,RoR");
  const map = {};
@@ -510,7 +658,7 @@ document.getElementById("csvBtn").onclick = () => {
  URL.revokeObjectURL(url);
 };
 
-// ===== CSV Import =====
+// CSV import (supports our export format)
 document.getElementById("loadCsv").onchange = e => {
  const file = e.target.files[0];
  if(!file) return;
@@ -528,25 +676,21 @@ document.getElementById("loadCsv").onchange = e => {
      const line = raw.trim();
      if(!line) return;
      if(line.startsWith("#")){
-       // meta
        if(line.startsWith("# Date,")) { document.getElementById("metaDate").value = line.split(",")[1] || ""; return; }
        if(line.startsWith("# Country,")) { document.getElementById("metaCountry").value = line.split(",")[1] || ""; return; }
        if(line.startsWith("# Farm,")) { document.getElementById("metaFarm").value = line.split(",")[1] || ""; return; }
        if(line.startsWith("# Variety,")) { document.getElementById("metaVariety").value = line.split(",")[1] || ""; return; }
        if(line.startsWith("# Process,")) { document.getElementById("metaProcess").value = line.split(",")[1] || ""; return; }
        if(line.startsWith("# Altitude,")) { document.getElementById("metaAltitude").value = line.split(",")[1] || ""; return; }
-       // sections
        if(line.startsWith("# Events")) { mode = "events"; return; }
        if(line.startsWith("# MinuteLog")) { mode = "minutelog"; return; }
        if(line.startsWith("# TimeSeries")) { mode = "timeseries"; return; }
-       // phase times
        if(line.startsWith("# TP,")) { tpTime = minSecToSec(line.split(",")[1]); return; }
        if(line.startsWith("# DryEnd,")) { dryTime = minSecToSec(line.split(",")[1]); return; }
        if(line.startsWith("# FirstCrack,")) { fcTime = minSecToSec(line.split(",")[1]); return; }
        if(line.startsWith("# Drop,")) { dropTime = minSecToSec(line.split(",")[1]); return; }
        return;
      }
-     // skip CSV headers like "Time,..." or "Event,..."
      if(line.match(/^(Time|Event),/i)) return;
      const parts = line.split(",");
      if(mode === "events"){
@@ -573,7 +717,7 @@ document.getElementById("loadCsv").onchange = e => {
        }
        return;
      }
-     // default: timeseries
+     // timeseries
      const [timeStr, tStr, gStr, aStr, rStr] = parts;
      const sec = minSecToSec(timeStr);
      if(!isFinite(sec)) return;
@@ -583,7 +727,6 @@ document.getElementById("loadCsv").onchange = e => {
      if(rStr) rorData.push({x:sec, y: Number(rStr)});
    });
 
-   // finalize
    startTime = Date.now();
    if(!dropTime){
      endTime = Math.max(0, ...(tempData.map(d=>d.x).concat(gasData.map(d=>d.x), airData.map(d=>d.x))));
@@ -591,16 +734,14 @@ document.getElementById("loadCsv").onchange = e => {
    } else {
      endTime = dropTime;
    }
-   // set lastMinuteLogged to last minute in minuteLog if available
    lastMinuteLogged = minuteLog.length? minuteLog[minuteLog.length-1].min : -1;
    draw();
  };
  reader.readAsText(file);
 };
 
-// init history UI
+// initialize
 updateHistory();
-
 </script>
 </body>
 </html>
