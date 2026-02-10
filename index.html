@@ -241,12 +241,16 @@ function calcPhaseRatio(){
   if(total <= 0) return null;
 
   const toPct = n => (n / total * 100).toFixed(1);
+  const toTime = sec => secToMinSec(sec);
 
   return {
-    drying: toPct(drying),
-    maillard: toPct(maillard),
-    dev: toPct(dev),
-    devTime: secToMinSec(dev)   // mm:ss 表記
+    dryingPct: toPct(drying),
+    maillardPct: toPct(maillard),
+    devPct: toPct(dev),
+    dryingTime: toTime(drying),
+    maillardTime: toTime(maillard),
+    devTime: toTime(dev),
+    totalTime: toTime(total)
   };
 }
 
@@ -402,10 +406,10 @@ dropBtn.onclick=()=>{
  const ratio = calcPhaseRatio();
 if(ratio){
  phaseText.innerHTML = `
-  Drying: ${ratio.drying}%<br>
-  Maillard: ${ratio.maillard}%<br>
-  Development: ${ratio.dev}%<br>
-  Dev Time: ${ratio.devTime}
+ Drying: ${ratio.dryingPct}% (${ratio.dryingTime})<br>
+ Maillard: ${ratio.maillardPct}% (${ratio.maillardTime})<br>
+ Development: ${ratio.devPct}% (${ratio.devTime})<br>
+ Total: ${ratio.totalTime}
  `;
 }
 // ローカル保存
@@ -459,12 +463,16 @@ csvBtn.onclick=()=>{
  csv.push(`# Drop,${secToMinSec(dropTime||0)}`);
 
  const ratio = calcPhaseRatio();
- if(ratio){
-  csv.push(`# DryingRate,${ratio.drying}%`);
-  csv.push(`# MaillardRate,${ratio.maillard}%`);
-  csv.push(`# DevelopmentRate,${ratio.dev}%`);
-  csv.push(`# DevelopmentTime,${ratio.devTime}`);
- }
+if(ratio){
+ csv.push(`# DryingTime,${ratio.dryingTime}`);
+ csv.push(`# MaillardTime,${ratio.maillardTime}`);
+ csv.push(`# DevelopmentTime,${ratio.devTime}`);
+ csv.push(`# TotalTime,${ratio.totalTime}`);
+
+ csv.push(`# DryingRate,${ratio.dryingPct}%`);
+ csv.push(`# MaillardRate,${ratio.maillardPct}%`);
+ csv.push(`# DevelopmentRate,${ratio.devPct}%`);
+}
 
  csv.push("Time,Temp,Gas,RoR");
 
@@ -501,6 +509,42 @@ function updateHistoryList(){
  });
 }
 updateHistoryList();
+
+loadCsv.onchange = e=>{
+ const file = e.target.files[0];
+ if(!file) return;
+
+ const reader = new FileReader();
+ reader.onload = ev=>{
+  const lines = ev.target.result.split("\n");
+
+  tempData.length=0;
+  gasData.length=0;
+  rorData.length=0;
+
+  for(let line of lines){
+    line=line.trim();
+    if(!line || line.startsWith("#")) continue;
+
+    const [time,temp,gas,ror] = line.split(",");
+    const [m,s]=time.split(":").map(Number);
+    const sec=m*60+s;
+
+    if(temp) tempData.push({x:sec,y:parseFloat(temp)});
+    if(gas) gasData.push({x:sec,y:parseFloat(gas)});
+    if(ror) rorData.push({x:sec,y:parseFloat(ror)});
+  }
+
+  // 再描画
+  chart.data.datasets[0].data=tempData;
+  chart.data.datasets[2].data=rorData;
+  chart.data.datasets[3].data=gasData;
+  chart.update();
+
+  alert("CSV読み込み完了");
+ };
+ reader.readAsText(file);
+};
 </script>
 </body>
 </html>
