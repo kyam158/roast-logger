@@ -31,6 +31,8 @@ th,td{border:1px solid #444;padding:2px;text-align:center}
 thead{position:sticky;top:0;background:#000;color:#fff}
 
 input,select{font-size:16px!important}
+
+#bottomSpacer{height:120px}
 </style>
 </head>
 
@@ -39,7 +41,23 @@ input,select{font-size:16px!important}
 
   <div id="chartWrap"><canvas id="chart"></canvas></div>
   <div id="phaseText">Phase: waiting...</div>
+<div id="logTableWrap">
+  <table id="logTable">
+    <thead>
+      <tr><th>Time</th><th>Temp</th><th>Gas</th><th>Air</th><th>RoR</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
 
+<div id="eventTableWrap">
+  <table id="eventTable">
+    <thead>
+      <tr><th>Event</th><th>Time</th><th>Temp</th><th>Gas</th><th>Air</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
   <div id="panel">
 
     <div id="time">0:00</div>
@@ -78,7 +96,7 @@ input,select{font-size:16px!important}
       <button id="airSet">決定</button>
     </div>
 
-    <button id="chargeBtn">Charge</button>
+    <button id="tpBtn">Turning Point</button>
     <button id="dryBtn">Dry End（長押し）</button>
     <button id="fcBtn">1st Crack（長押し）</button>
     <button id="dropBtn">DROP</button>
@@ -88,28 +106,14 @@ input,select{font-size:16px!important}
 
     <select id="historySelect"><option value="">履歴</option></select>
 
-    <!-- 1分ログ表 -->
-    <div id="logTableWrap">
-      <table id="logTable">
-        <thead>
-          <tr><th>Time</th><th>Temp</th><th>Gas</th><th>Air</th><th>RoR</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
+   <h3>Green Bean Info</h3>
+<label>日付</label><input id="metaDate" type="date">
 
-    <!-- イベント表 -->
-    <div id="eventTableWrap">
-      <table id="eventTable">
-        <thead>
-          <tr><th>Event</th><th>Time</th><th>Temp</th><th>Gas</th><th>Air</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-
-  </div>
-</div>
+<label>国</label><input id="metaCountry">
+<label>農園</label><input id="metaFarm">
+<label>品種</label><input id="metaVariety">
+<label>プロセス</label><input id="metaProcess">
+<label>標高</label><input id="metaAltitude">
 
 <script>
 Chart.register(window['chartjs-plugin-annotation']);
@@ -126,7 +130,7 @@ const secToMinSec = fmt;
 let startTime=null,endTime=null,timer=null;
 let temp=150, gas=2.5, air=0.0;
 const tempData=[], gasData=[], airData=[], rorData=[];
-let chargeTime=null, dryTime=null, fcTime=null, dropTime=null;
+let tpTime=null, dryTime=null, fcTime=null, dropTime=null;
 
 // 1分ログ / イベントログ
 const minuteLog = []; // {min, time, temp, gas, air, ror}
@@ -223,11 +227,11 @@ function updateMinuteLogIfNeeded(){
 
 // ===== フェーズ =====
 function calcPhaseRatio(){
- if(!chargeTime||!dryTime||!fcTime||!dropTime) return null;
- const drying=dryTime-chargeTime;
+ if(!tpTime||!dryTime||!fcTime||!dropTime) return null;
+ const drying=dryTime-tpTime;
  const maillard=fcTime-dryTime;
  const dev=dropTime-fcTime;
- const total=dropTime-chargeTime;
+ const total=dropTime-tpTime;
  const pct=n=> (n/total*100).toFixed(1);
  return {
   drying,maillard,dev,
@@ -261,7 +265,7 @@ function draw(){
   if(time==null) return;
   ann[k] = {type:"line", xMin:time, xMax:time, borderColor:color, borderWidth:2, label:{display:true,content:label}};
  };
- addLine("charge", chargeTime, "Charge", "blue");
+ addLine("tp", tpTime, "TP", "purple");
  addLine("dry", dryTime, "Dry", "orange");
  addLine("fc", fcTime, "1C", "red");
  addLine("drop", dropTime, "Drop", "black");
@@ -347,7 +351,10 @@ dryBtn.onpointerdown = e => { e.preventDefault(); holdStart(()=>{ dryTime = nowS
 fcBtn.onpointerdown = e => { e.preventDefault(); holdStart(()=>{ fcTime = nowSec(); addEventLog("1st Crack"); }); };
 [dryBtn, fcBtn].forEach(b => { b.onpointerup = holdCancel; b.onpointercancel = holdCancel; });
 
-chargeBtn.onclick = ()=>{ chargeTime = nowSec(); addEventLog("Charge"); };
+tpBtn.onclick = ()=>{
+ tpTime = nowSec();
+ addEventLog("Turning Point");
+};
 dropBtn.onclick = ()=>{
  dropTime = nowSec();
  endTime = dropTime;
@@ -372,7 +379,15 @@ function saveHistory(){
  };
  history.push(snapshot);
  localStorage.setItem("roastHistory", JSON.stringify(history));
- updateHistory();
+ meta:{
+ date: metaDate.value,
+ country: metaCountry.value,
+ farm: metaFarm.value,
+ variety: metaVariety.value,
+ process: metaProcess.value,
+ altitude: metaAltitude.value
+}
+updateHistory();
 }
 function updateHistory(){
  const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
@@ -388,6 +403,15 @@ historySelect.onchange = ()=>{
  if(!h || !h.length) return;
  const r = h[historySelect.value];
  if(!r) return;
+
+if(r.meta){
+ metaDate.value = r.meta.date||"";
+ metaCountry.value = r.meta.country||"";
+ metaFarm.value = r.meta.farm||"";
+ metaVariety.value = r.meta.variety||"";
+ metaProcess.value = r.meta.process||"";
+ metaAltitude.value = r.meta.altitude||"";
+}
 
  // load arrays (replace contents)
  tempData.length = 0; gasData.length = 0; airData.length = 0; rorData.length = 0;
@@ -449,7 +473,12 @@ csvBtn.onclick = ()=>{
   csv.push(`# MaillardRate,${ratio.maillardPct}%`);
   csv.push(`# DevRate,${ratio.devPct}%`);
  }
-
+csv.push(`# Date,${metaDate.value}`);
+csv.push(`# Country,${metaCountry.value}`);
+csv.push(`# Farm,${metaFarm.value}`);
+csv.push(`# Variety,${metaVariety.value}`);
+csv.push(`# Process,${metaProcess.value}`);
+csv.push(`# Altitude,${metaAltitude.value}`);
 // events section
 csv.push("# Events");
 csv.push("Event,Time,Temp,Gas,Air");
@@ -583,7 +612,7 @@ function minSecToSec(str){
 
 // initialize history dropdown
 updateHistory();
-
+<div id="bottomSpacer"></div>
 </script>
 </body>
 </html>
