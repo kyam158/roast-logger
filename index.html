@@ -202,9 +202,9 @@ const chart=new Chart(document.getElementById("chart"),{
  plugins:[phaseTextPlugin],
 type:"line",
  data:{datasets:[
- {label:"Temp",data:[],borderWidth:2,borderColor:"red",tension:.3,pointRadius:0},
+ {label:"Temp",data:[],borderWidth:3,borderColor:"red",tension:.3,pointRadius:0},
  {label:"Compare",data:[],borderDash:[6,4],borderColor:"#999",pointRadius:0},
- {label:"RoR",data:[],yAxisID:"yRoR",borderWidth:2,borderColor:"blue",tension:.3,pointRadius:0},
+ {label:"RoR",data:[],yAxisID:"yRoR",borderWidth:3,borderColor:"blue",tension:.3,pointRadius:0},
  {label:"Gas",data:[],yAxisID:"yR",borderDash:[4,4],borderColor:"green"}
 ]}
 ,
@@ -306,7 +306,7 @@ function draw(){
    type:"line",
    xMin:time,xMax:time,
    borderColor:color,
-   borderWidth:2,
+   borderWidth:3,
    label:{display:true,content:label}
   };
  };
@@ -331,7 +331,10 @@ startBtn.onclick=()=>{
  rorData.length=0;
  chargeTime=tpTime=dryTime=fcTime=dropTime=null;
 
- chart.data.datasets.forEach(d=>d.data=[]);
+chart.data.datasets[0].data = tempData;
+chart.data.datasets[1].data = [];
+chart.data.datasets[2].data = rorData;
+chart.data.datasets[3].data = gasData;
 
  document.querySelector("#eventTable tbody").innerHTML="";
  tempData.push({x:0,y:startTemp});
@@ -397,10 +400,33 @@ dropBtn.onclick=()=>{
  draw();
 
  const ratio = calcPhaseRatio();
- if(ratio){
-  document.getElementById("phaseText").innerHTML =
-   `Drying ${ratio.drying}% ｜ Maillard ${ratio.maillard}% ｜ Development ${ratio.dev}% (${ratio.devTime})`;
+if(ratio){
+ phaseText.innerHTML = `
+  Drying: ${ratio.drying}%<br>
+  Maillard: ${ratio.maillard}%<br>
+  Development: ${ratio.dev}%<br>
+  Dev Time: ${ratio.devTime}
+ `;
+}
+// ローカル保存
+const history = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+
+history.push({
+ date: new Date().toISOString(),
+ tempData, gasData, rorData,
+ chargeTime, dryTime, fcTime, dropTime,
+ meta:{
+  country:country.value,
+  farm:farm.value,
+  variety:variety.value,
+  process:process.value,
+  altitude:altitude.value,
+  roastDate:roastDate.value
  }
+});
+
+localStorage.setItem("roastHistory", JSON.stringify(history));
+updateHistoryList();
 };
 /* iOSキーボード固定防止 */
 let scrollY=0;
@@ -418,7 +444,29 @@ document.querySelectorAll("input").forEach(el=>{
 });
 
 csvBtn.onclick=()=>{
- let csv=["Time,Temp,Gas,RoR"];
+ let csv=[];
+ csv.push("# Roast Logger CSV");
+ csv.push(`# Country,${country.value}`);
+ csv.push(`# Farm,${farm.value}`);
+ csv.push(`# Variety,${variety.value}`);
+ csv.push(`# Process,${process.value}`);
+ csv.push(`# Altitude,${altitude.value}`);
+ csv.push(`# RoastDate,${roastDate.value}`);
+
+ csv.push(`# Charge,${secToMinSec(chargeTime||0)}`);
+ csv.push(`# DryEnd,${secToMinSec(dryTime||0)}`);
+ csv.push(`# FirstCrack,${secToMinSec(fcTime||0)}`);
+ csv.push(`# Drop,${secToMinSec(dropTime||0)}`);
+
+ const ratio = calcPhaseRatio();
+ if(ratio){
+  csv.push(`# DryingRate,${ratio.drying}%`);
+  csv.push(`# MaillardRate,${ratio.maillard}%`);
+  csv.push(`# DevelopmentRate,${ratio.dev}%`);
+  csv.push(`# DevelopmentTime,${ratio.devTime}`);
+ }
+
+ csv.push("Time,Temp,Gas,RoR");
 
  for(let i=0;i<tempData.length;i++){
   const t=tempData[i];
@@ -428,17 +476,28 @@ csvBtn.onclick=()=>{
  }
 
  const blob=new Blob([csv.join("\n")],{type:"text/csv;charset=utf-8;"});
- const url=URL.createObjectURL(blob);
-
  const a=document.createElement("a");
- a.href=url;
- a.download="roast_log.csv";
- document.body.appendChild(a);
+ a.href=URL.createObjectURL(blob);
+ a.download=`roast_${Date.now()}.csv`;
  a.click();
+};
  document.body.removeChild(a);
  URL.revokeObjectURL(url);
 };
+function updateHistoryList(){
+ const history = JSON.parse(localStorage.getItem("roastHistory")||"[]");
+ historySelect.innerHTML='<option value="">履歴</option>';
+ compareSelect.innerHTML='<option value="">比較</option>';
 
+ history.forEach((h,i)=>{
+  const opt=document.createElement("option");
+  opt.value=i;
+  opt.textContent=`${h.meta.roastDate || "NoDate"} #${i+1}`;
+  historySelect.appendChild(opt);
+  compareSelect.appendChild(opt.cloneNode(true));
+ });
+}
+updateHistoryList();
 </script>
 </body>
 </html>
