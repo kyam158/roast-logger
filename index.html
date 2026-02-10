@@ -30,8 +30,6 @@ table{width:100%;border-collapse:collapse;font-size:12px}
 th,td{border:1px solid #444;padding:2px;text-align:center}
 thead{position:sticky;top:0;background:#000;color:#fff}
 
-input,select{font-size:16px!important}
-
 #bottomSpacer{height:120px}
 </style>
 </head>
@@ -39,112 +37,98 @@ input,select{font-size:16px!important}
 <body>
 <div id="container">
 
-  <div id="chartWrap"><canvas id="chart"></canvas></div>
-  <div id="phaseText">Phase: waiting...</div>
+<div id="chartWrap"><canvas id="chart"></canvas></div>
+<div id="phaseText">Phase: waiting...</div>
+
 <div id="logTableWrap">
-  <table id="logTable">
-    <thead>
-      <tr><th>Time</th><th>Temp</th><th>Gas</th><th>Air</th><th>RoR</th></tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+<table id="logTable">
+<thead><tr><th>Time</th><th>Temp</th><th>Gas</th><th>Air</th><th>RoR</th></tr></thead>
+<tbody></tbody>
+</table>
 </div>
 
 <div id="eventTableWrap">
-  <table id="eventTable">
-    <thead>
-      <tr><th>Event</th><th>Time</th><th>Temp</th><th>Gas</th><th>Air</th></tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+<table id="eventTable">
+<thead><tr><th>Event</th><th>Time</th><th>Temp</th><th>Gas</th><th>Air</th></tr></thead>
+<tbody></tbody>
+</table>
 </div>
-  <div id="panel">
 
-    <div id="time">0:00</div>
+<div id="panel">
+<div id="time">0:00</div>
 
-    <label>開始温度</label>
-    <input id="startTempInput" type="number" value="150">
-    <button id="startBtn">焙煎開始</button>
+<label>開始温度</label>
+<input id="startTempInput" type="number" value="150">
+<button id="startBtn">焙煎開始</button>
 
-    <label>豆温</label>
-    <div class="row">
-      <input id="tempInput" type="number" value="150">
-      <button id="tempSet">決定</button>
-    </div>
+<label>豆温</label>
+<div class="row">
+<input id="tempInput" type="number" value="150">
+<button id="tempSet">決定</button>
+</div>
 
-    <label>Gas</label>
-    <div class="row">
-      <button id="gasDown">−</button>
-      <div id="gasLabel" style="text-align:center;font-size:20px;line-height:48px">2.5</div>
-      <button id="gasUp">＋</button>
-    </div>
+<label>Gas</label>
+<div class="row">
+<button id="gasDown">−</button>
+<div id="gasLabel">2.5</div>
+<button id="gasUp">＋</button>
+</div>
+<div class="row">
+<input id="gasInput" type="number" step="0.1" value="2.5">
+<button id="gasSet">決定</button>
+</div>
 
-    <div class="row">
-      <input id="gasInput" type="number" step="0.1" value="2.5">
-      <button id="gasSet">決定</button>
-    </div>
+<label>Air</label>
+<div class="row">
+<button id="airDown">−</button>
+<div id="airLabel">0.0</div>
+<button id="airUp">＋</button>
+</div>
+<div class="row">
+<input id="airInput" type="number" step="0.1" value="0.0">
+<button id="airSet">決定</button>
+</div>
 
-    <label>Air</label>
-    <div class="row">
-      <button id="airDown">−</button>
-      <div id="airLabel" style="text-align:center;font-size:20px;line-height:48px">0.0</div>
-      <button id="airUp">＋</button>
-    </div>
+<button id="tpBtn">Turning Point</button>
+<button id="dryBtn">Dry End（長押し）</button>
+<button id="fcBtn">1st Crack（長押し）</button>
+<button id="dropBtn">DROP</button>
 
-    <div class="row">
-      <input id="airInput" type="number" step="0.1" value="0.0">
-      <button id="airSet">決定</button>
-    </div>
+<button id="csvBtn">CSV Export</button>
+<input id="loadCsv" type="file" accept=".csv">
+<select id="historySelect"><option value="">履歴</option></select>
 
-    <button id="tpBtn">Turning Point</button>
-    <button id="dryBtn">Dry End（長押し）</button>
-    <button id="fcBtn">1st Crack（長押し）</button>
-    <button id="dropBtn">DROP</button>
-
-    <button id="csvBtn">CSV Export</button>
-    <input id="loadCsv" type="file" accept=".csv">
-
-    <select id="historySelect"><option value="">履歴</option></select>
-
-   <h3>Green Bean Info</h3>
+<h3>Green Bean Info</h3>
 <label>日付</label><input id="metaDate" type="date">
-
 <label>国</label><input id="metaCountry">
 <label>農園</label><input id="metaFarm">
 <label>品種</label><input id="metaVariety">
 <label>プロセス</label><input id="metaProcess">
 <label>標高</label><input id="metaAltitude">
+</div>
+
+<div id="bottomSpacer"></div>
 
 <script>
 Chart.register(window['chartjs-plugin-annotation']);
-
-// ===== iPad 判定 =====
-const isIPad = navigator.userAgent.includes("iPad") || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
-document.body.classList.add(isIPad?"ipad":"iphone");
-
-// ===== util =====
 const fmt=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
-const secToMinSec = fmt;
 
 // ===== 状態 =====
 let startTime=null,endTime=null,timer=null;
-let temp=150, gas=2.5, air=0.0;
-const tempData=[], gasData=[], airData=[], rorData=[];
-let tpTime=null, dryTime=null, fcTime=null, dropTime=null;
+let temp=150,gas=2.5,air=0;
+const tempData=[],gasData=[],airData=[],rorData=[];
+let tpTime=null,dryTime=null,fcTime=null,dropTime=null;
 
-// 1分ログ / イベントログ
-const minuteLog = []; // {min, time, temp, gas, air, ror}
-const eventLog = []; // {name, time, temp, gas, air}
-
-let lastMinuteLogged = -1;
-
-const nowSec = ()=> endTime ?? Math.floor((Date.now()-startTime)/1000);
+// logs
+const minuteLog=[],eventLog=[];
+let lastMinuteLogged=-1;
+const nowSec=()=>endTime ?? Math.floor((Date.now()-startTime)/1000);
 
 // ===== Chart =====
-const chart=new Chart(chartWrap.firstChild,{
+const chart=new Chart(document.getElementById("chart"),{
  type:"line",
  data:{datasets:[
-  {label:"Temp",data:[],borderColor:"red",borderWidth:3,tension:.3,pointRadius:0},
+  {label:"Temp",data:[],borderColor:"red",borderWidth:2,pointRadius:0},
   {label:"RoR",data:[],yAxisID:"yRoR",borderColor:"blue",borderWidth:2,pointRadius:0},
   {label:"Gas",data:[],yAxisID:"yGas",borderColor:"green",borderDash:[4,4],pointRadius:0},
   {label:"Air",data:[],yAxisID:"yAir",borderColor:"cyan",borderDash:[2,2],pointRadius:0}
@@ -154,9 +138,9 @@ const chart=new Chart(chartWrap.firstChild,{
   scales:{
    x:{type:"linear",ticks:{callback:v=>fmt(v)}},
    y:{min:0,max:260},
-   yRoR:{position:"right",min:0,max:40,grid:{drawOnChartArea:false}},
-   yGas:{position:"right",min:0,max:5,offset:true,grid:{drawOnChartArea:false}},
-   yAir:{position:"right",min:0,max:10,offset:true,grid:{drawOnChartArea:false}}
+   yRoR:{position:"right",min:0,max:40},
+   yGas:{position:"right",min:0,max:5,offset:true},
+   yAir:{position:"right",min:0,max:10,offset:true}
   },
   plugins:{annotation:{annotations:{}}}
  }
@@ -166,305 +150,117 @@ const chart=new Chart(chartWrap.firstChild,{
 function calcRoR(){
  rorData.length=0;
  for(let i=1;i<tempData.length;i++){
-  const p=tempData[i-1], c=tempData[i];
-  const dt=c.x-p.x; if(dt<=0) continue;
+  const p=tempData[i-1],c=tempData[i];
+  const dt=c.x-p.x;if(dt<=0)continue;
   rorData.push({x:c.x,y:+((c.y-p.y)*60/dt).toFixed(1)});
  }
 }
 
-// ===== イベントログ追加 =====
-function addEventLog(name){
- const t = nowSec();
- const tempRec = [...tempData].reverse().find(d=>d.x<=t);
- const gasRec = [...gasData].reverse().find(d=>d.x<=t);
- const airRec = [...airData].reverse().find(d=>d.x<=t);
- const row = {
-  name,
-  time: secToMinSec(t),
-  temp: tempRec ? tempRec.y.toFixed(0) : (temp?temp.toFixed(0):""),
-  gas: gasRec ? gasRec.y.toFixed(1) : (gas?gas.toFixed(1):""),
-  air: airRec ? airRec.y.toFixed(1) : (air?air.toFixed(1):"")
- };
- eventLog.push({name, t, temp: Number(row.temp)||"", gas: Number(row.gas)||"", air: Number(row.air)||""});
-
- // 表に追加
- const tbody = document.querySelector("#eventTable tbody");
- const tr = document.createElement("tr");
- tr.innerHTML = `<td>${row.name}</td><td>${row.time}</td><td>${row.temp}</td><td>${row.gas}</td><td>${row.air}</td>`;
- tbody.appendChild(tr);
-}
-
-// ===== 1分ログ更新 =====
-function updateMinuteLogIfNeeded(){
- if(!startTime) return;
- const s = nowSec();
- const min = Math.floor(s/60);
- if(min <= lastMinuteLogged) return;
- // log every minute between lastMinuteLogged+1 .. min
- for(let m=lastMinuteLogged+1; m<=min; m++){
-   const sec = m*60;
-   // find nearest records at or before sec
-   const tRec = [...tempData].reverse().find(d=>d.x<=sec);
-   const gRec = [...gasData].reverse().find(d=>d.x<=sec);
-   const aRec = [...airData].reverse().find(d=>d.x<=sec);
-   const rRec = [...rorData].reverse().find(d=>d.x<=sec);
-   minuteLog.push({
-     min: m,
-     time: secToMinSec(sec),
-     temp: tRec? tRec.y.toFixed(0) : "",
-     gas: gRec? gRec.y.toFixed(1) : "",
-     air: aRec? aRec.y.toFixed(1) : "",
-     ror: rRec? rRec.y.toFixed(1) : ""
-   });
-   // append to table
-   const tbody = document.querySelector("#logTable tbody");
-   const tr = document.createElement("tr");
-   tr.innerHTML = `<td>${secToMinSec(sec)}</td><td>${tRec? tRec.y.toFixed(0):""}</td><td>${gRec? gRec.y.toFixed(1):""}</td><td>${aRec? aRec.y.toFixed(1):""}</td><td>${rRec? rRec.y.toFixed(1):""}</td>`;
-   tbody.appendChild(tr);
- }
- lastMinuteLogged = min;
-}
-
-// ===== フェーズ =====
+// ===== フェーズ比率 =====
 function calcPhaseRatio(){
- if(!tpTime||!dryTime||!fcTime||!dropTime) return null;
- const drying=dryTime-tpTime;
- const maillard=fcTime-dryTime;
- const dev=dropTime-fcTime;
+ if(!tpTime||!dryTime||!fcTime||!dropTime)return null;
+ const drying=dryTime-tpTime,maillard=fcTime-dryTime,dev=dropTime-fcTime;
  const total=dropTime-tpTime;
- const pct=n=> (n/total*100).toFixed(1);
- return {
-  drying,maillard,dev,
-  dryingTime:fmt(drying),
-  maillardTime:fmt(maillard),
-  devTime:fmt(dev),
-  dryingPct:pct(drying),
-  maillardPct:pct(maillard),
-  devPct:pct(dev)
- };
+ const pct=n=>(n/total*100).toFixed(1);
+ return{drying,maillard,dev,
+ dryingTime:fmt(drying),maillardTime:fmt(maillard),devTime:fmt(dev),
+ dryingPct:pct(drying),maillardPct:pct(maillard),devPct:pct(dev)};
 }
 
 // ===== 描画 =====
 function draw(){
- if(!startTime) return;
- const t = nowSec();
- time.textContent = fmt(t);
-
+ if(!startTime)return;
+ const t=nowSec();
+ time.textContent=fmt(t);
  calcRoR();
+ chart.data.datasets[0].data=tempData;
+ chart.data.datasets[1].data=rorData;
+ chart.data.datasets[2].data=gasData;
+ chart.data.datasets[3].data=airData;
+ chart.options.scales.x.max=Math.max(600,t+10);
 
- chart.data.datasets[0].data = tempData;
- chart.data.datasets[1].data = rorData;
- chart.data.datasets[2].data = gasData;
- chart.data.datasets[3].data = airData;
+ const ann=chart.options.plugins.annotation.annotations={};
+ const add=(k,t,l,c)=>{if(t!=null)ann[k]={type:"line",xMin:t,xMax:t,borderColor:c,borderWidth:2,label:{display:true,content:l}}};
+ add("tp",tpTime,"TP","purple");
+ add("dry",dryTime,"Dry","orange");
+ add("fc",fcTime,"1C","red");
+ add("drop",dropTime,"Drop","black");
 
- chart.options.scales.x.max = Math.max(600, t+10);
-
- // annotation
- const ann = chart.options.plugins.annotation.annotations = {};
- const addLine = (k,time,label,color)=>{
-  if(time==null) return;
-  ann[k] = {type:"line", xMin:time, xMax:time, borderColor:color, borderWidth:2, label:{display:true,content:label}};
- };
- addLine("tp", tpTime, "TP", "purple");
- addLine("dry", dryTime, "Dry", "orange");
- addLine("fc", fcTime, "1C", "red");
- addLine("drop", dropTime, "Drop", "black");
-
- // update minute log & phase text
- updateMinuteLogIfNeeded();
- const ratio = calcPhaseRatio();
- if(ratio){
-  phaseText.innerHTML = `Dry ${ratio.dryingTime} (${ratio.dryingPct}%) | Maillard ${ratio.maillardTime} (${ratio.maillardPct}%) | Dev ${ratio.devTime} (${ratio.devPct}%)`;
- } else {
-  // when not complete but have charge/dry/fc present, show partial info
-  let partial = [];
-  if(chargeTime) partial.push(`Charge ${secToMinSec(chargeTime)}`);
-  if(dryTime) partial.push(`Dry ${secToMinSec(dryTime)}`);
-  if(fcTime) partial.push(`1C ${secToMinSec(fcTime)}`);
-  if(dropTime) partial.push(`Drop ${secToMinSec(dropTime)}`);
-  phaseText.innerHTML = partial.length? partial.join(" | ") : "Phase: waiting...";
- }
+ const ratio=calcPhaseRatio();
+ phaseText.innerHTML=ratio?
+ `Dry ${ratio.dryingTime} (${ratio.dryingPct}%) | Maillard ${ratio.maillardTime} (${ratio.maillardPct}%) | Dev ${ratio.devTime} (${ratio.devPct}%)`
+ :"Phase: waiting...";
 
  chart.update();
 }
 
 // ===== 操作 =====
 startBtn.onclick=()=>{
- startTime = Date.now(); endTime = null;
- tempData.length = gasData.length = airData.length = rorData.length = 0;
- minuteLog.length = 0;
- eventLog.length = 0;
- lastMinuteLogged = -1;
-
- chargeTime = dryTime = fcTime = dropTime = null;
-
- temp = parseInt(startTempInput.value) || 150;
- tempData.push({x:0, y: temp});
- gasData.push({x:0, y: gas});
- airData.push({x:0, y: air});
-
- // clear tables
- document.querySelector("#logTable tbody").innerHTML = "";
- document.querySelector("#eventTable tbody").innerHTML = "";
-
+ startTime=Date.now();endTime=null;
+ tempData.length=gasData.length=airData.length=rorData.length=0;
+ tpTime=dryTime=fcTime=dropTime=null;
+ temp=+startTempInput.value||150;
+ tempData.push({x:0,y:temp});
+ gasData.push({x:0,y:gas});
+ airData.push({x:0,y:air});
  clearInterval(timer);
- timer = setInterval(draw, 1000);
+ timer=setInterval(draw,1000);
  draw();
 };
 
-tempSet.onclick=()=>{
- temp = parseInt(tempInput.value) || temp;
- tempData.push({x: nowSec(), y: temp});
- draw();
-};
+tempSet.onclick=()=>{temp=+tempInput.value;tempData.push({x:nowSec(),y:temp});draw();};
+const setGas=v=>{gas=Math.max(0,Math.min(5,v));gasLabel.textContent=gas.toFixed(1);gasInput.value=gas;gasData.push({x:nowSec(),y:gas});draw();};
+gasUp.onclick=()=>setGas(gas+0.1);gasDown.onclick=()=>setGas(gas-0.1);gasSet.onclick=()=>setGas(+gasInput.value);
 
-const setGas = v => {
- gas = Math.max(0, Math.min(5, Number(v.toFixed(1))));
- gasLabel.textContent = gas.toFixed(1);
- gasInput.value = gas.toFixed(1);
- gasData.push({x: nowSec(), y: gas});
- addEventLog("Gas Change");
- draw();
-};
-gasUp.onclick=()=>setGas(Number(gas)+0.1);
-gasDown.onclick=()=>setGas(Number(gas)-0.1);
-gasSet.onclick=()=>setGas(parseFloat(gasInput.value));
+const setAir=v=>{air=Math.max(0,v);airLabel.textContent=air.toFixed(1);airInput.value=air;airData.push({x:nowSec(),y:air});draw();};
+airUp.onclick=()=>setAir(air+0.1);airDown.onclick=()=>setAir(air-0.1);airSet.onclick=()=>setAir(+airInput.value);
 
-const setAir = v => {
- air = Math.max(0, Number(v.toFixed(1)));
- airLabel.textContent = air.toFixed(1);
- airInput.value = air.toFixed(1);
- airData.push({x: nowSec(), y: air});
- addEventLog("Air Change");
- draw();
-};
-airUp.onclick=()=>setAir(Number(air)+0.1);
-airDown.onclick=()=>setAir(Number(air)-0.1);
-airSet.onclick=()=>setAir(parseFloat(airInput.value));
+let hold=null;
+const holdStart=f=>hold=setTimeout(f,600);
+const holdCancel=()=>clearTimeout(hold);
+dryBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>dryTime=nowSec());};
+fcBtn.onpointerdown=e=>{e.preventDefault();holdStart(()=>fcTime=nowSec());};
+[dryBtn,fcBtn].forEach(b=>b.onpointerup=holdCancel);
 
-// 長押しイベント（Dry / 1C）
-let hold = null;
-const holdStart = f => hold = setTimeout(f, 600);
-const holdCancel = ()=>{ if(hold) clearTimeout(hold); hold=null; };
-
-dryBtn.onpointerdown = e => { e.preventDefault(); holdStart(()=>{ dryTime = nowSec(); addEventLog("Dry End"); }); };
-fcBtn.onpointerdown = e => { e.preventDefault(); holdStart(()=>{ fcTime = nowSec(); addEventLog("1st Crack"); }); };
-[dryBtn, fcBtn].forEach(b => { b.onpointerup = holdCancel; b.onpointercancel = holdCancel; });
-
-tpBtn.onclick = ()=>{
- tpTime = nowSec();
- addEventLog("Turning Point");
-};
-dropBtn.onclick = ()=>{
- dropTime = nowSec();
- endTime = dropTime;
- addEventLog("Drop");
- clearInterval(timer);
- draw();
- saveHistory();
-};
+tpBtn.onclick=()=>tpTime=nowSec();
+dropBtn.onclick=()=>{dropTime=nowSec();endTime=dropTime;clearInterval(timer);draw();saveHistory();};
 
 // ===== 履歴保存 =====
 function saveHistory(){
- const history = JSON.parse(localStorage.getItem("roastHistory") || "[]");
- const snapshot = {
-  tempData: JSON.parse(JSON.stringify(tempData)),
-  gasData: JSON.parse(JSON.stringify(gasData)),
-  airData: JSON.parse(JSON.stringify(airData)),
-  rorData: JSON.parse(JSON.stringify(rorData)),
-  minuteLog: JSON.parse(JSON.stringify(minuteLog)),
-  eventLog: JSON.parse(JSON.stringify(eventLog)),
-  chargeTime, dryTime, fcTime, dropTime,
-  savedAt: new Date().toISOString()
- };
- history.push(snapshot);
- localStorage.setItem("roastHistory", JSON.stringify(history));
- meta:{
- date: metaDate.value,
- country: metaCountry.value,
- farm: metaFarm.value,
- variety: metaVariety.value,
- process: metaProcess.value,
- altitude: metaAltitude.value
-}
-updateHistory();
+ const h=JSON.parse(localStorage.getItem("roastHistory")||"[]");
+ h.push({
+  tempData,gasData,airData,rorData,tpTime,dryTime,fcTime,dropTime,
+  meta:{
+   date:metaDate.value,country:metaCountry.value,farm:metaFarm.value,
+   variety:metaVariety.value,process:metaProcess.value,altitude:metaAltitude.value
+  }
+ });
+ localStorage.setItem("roastHistory",JSON.stringify(h));
+ updateHistory();
 }
 function updateHistory(){
- const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
- historySelect.innerHTML = '<option value="">履歴</option>';
- h.forEach((r,i)=>{
-  const o = document.createElement("option");
-  o.value = i; o.textContent = `Roast ${i+1} (${new Date(r.savedAt).toLocaleString()})`;
+ const h=JSON.parse(localStorage.getItem("roastHistory")||"[]");
+ historySelect.innerHTML='<option value="">履歴</option>';
+ h.forEach((_,i)=>{
+  const o=document.createElement("option");
+  o.value=i;o.textContent=`Roast ${i+1}`;
   historySelect.appendChild(o);
  });
 }
-historySelect.onchange = ()=>{
- const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
- if(!h || !h.length) return;
- const r = h[historySelect.value];
- if(!r) return;
-
-if(r.meta){
- metaDate.value = r.meta.date||"";
- metaCountry.value = r.meta.country||"";
- metaFarm.value = r.meta.farm||"";
- metaVariety.value = r.meta.variety||"";
- metaProcess.value = r.meta.process||"";
- metaAltitude.value = r.meta.altitude||"";
-}
-
- // load arrays (replace contents)
- tempData.length = 0; gasData.length = 0; airData.length = 0; rorData.length = 0;
- r.tempData.forEach(d=>tempData.push(d));
- r.gasData.forEach(d=>gasData.push(d));
- r.airData.forEach(d=>airData.push(d));
- r.rorData.forEach(d=>rorData.push(d));
-
- // minute and event logs -> fill tables
- minuteLog.length = 0; eventLog.length = 0;
- document.querySelector("#logTable tbody").innerHTML = "";
- document.querySelector("#eventTable tbody").innerHTML = "";
- if(r.minuteLog){
-   r.minuteLog.forEach(m=>{
-     minuteLog.push(m);
-     const tr = document.createElement("tr");
-     tr.innerHTML = `<td>${m.time}</td><td>${m.temp}</td><td>${m.gas}</td><td>${m.air}</td><td>${m.ror}</td>`;
-     document.querySelector("#logTable tbody").appendChild(tr);
-   });
- }
- if(r.eventLog){
-   r.eventLog.forEach(ev=>{
-     eventLog.push(ev);
-     const tr = document.createElement("tr");
-     tr.innerHTML = `<td>${ev.name}</td><td>${secToMinSec(ev.t)}</td><td>${ev.temp}</td><td>${ev.gas}</td><td>${ev.air}</td>`;
-     document.querySelector("#eventTable tbody").appendChild(tr);
-   });
- }
-
- chargeTime = r.chargeTime; dryTime = r.dryTime; fcTime = r.fcTime; dropTime = r.dropTime;
- startTime = Date.now();
- lastMinuteLogged = Math.max(-1, (minuteLog.length? minuteLog[minuteLog.length-1].min : -1));
- // update display
- if(dropTime){
-   endTime = dropTime;
- } else {
-   endTime = null;
- }
- draw();
+historySelect.onchange=()=>{
+ const h=JSON.parse(localStorage.getItem("roastHistory"));
+ const r=h[historySelect.value]; if(!r)return;
+ Object.assign(tempData,r.tempData);Object.assign(gasData,r.gasData);
+ Object.assign(airData,r.airData);Object.assign(rorData,r.rorData);
+ tpTime=r.tpTime;dryTime=r.dryTime;fcTime=r.fcTime;dropTime=r.dropTime;
+ if(r.meta){metaDate.value=r.meta.date||"";metaCountry.value=r.meta.country||"";}
+ startTime=Date.now();draw();
 };
 
 // ===== CSV Export =====
-csvBtn.onclick = ()=>{
- let csv = [];
- // header
- csv.push("# Roast Logger CSV");
- csv.push(`# SavedAt,${new Date().toISOString()}`);
- if(chargeTime) csv.push(`# Charge,${secToMinSec(chargeTime)}`);
- if(dryTime) csv.push(`# DryEnd,${secToMinSec(dryTime)}`);
- if(fcTime) csv.push(`# FirstCrack,${secToMinSec(fcTime)}`);
- if(dropTime) csv.push(`# Drop,${secToMinSec(dropTime)}`);
-
- const ratio = calcPhaseRatio();
+csvBtn.onclick=()=>{
+ let csv=["# Roast Logger"];
+ const ratio=calcPhaseRatio();
  if(ratio){
   csv.push(`# DryingTime,${ratio.dryingTime}`);
   csv.push(`# MaillardTime,${ratio.maillardTime}`);
@@ -473,146 +269,17 @@ csvBtn.onclick = ()=>{
   csv.push(`# MaillardRate,${ratio.maillardPct}%`);
   csv.push(`# DevRate,${ratio.devPct}%`);
  }
-csv.push(`# Date,${metaDate.value}`);
-csv.push(`# Country,${metaCountry.value}`);
-csv.push(`# Farm,${metaFarm.value}`);
-csv.push(`# Variety,${metaVariety.value}`);
-csv.push(`# Process,${metaProcess.value}`);
-csv.push(`# Altitude,${metaAltitude.value}`);
-// events section
-csv.push("# Events");
-csv.push("Event,Time,Temp,Gas,Air");
- eventLog.forEach(ev=>{
-   csv.push(`${ev.name},${secToMinSec(ev.t)},${ev.temp},${ev.gas},${ev.air}`);
+ csv.push("Time,Temp,Gas,Air,RoR");
+ tempData.forEach(t=>{
+  const g=gasData.find(d=>d.x==t.x);
+  const a=airData.find(d=>d.x==t.x);
+  const r=rorData.find(d=>d.x==t.x);
+  csv.push(`${fmt(t.x)},${t.y},${g?g.y:""},${a?a.y:""},${r?r.y:""}`);
  });
-
-// minute log section
-csv.push("# MinuteLog");
-csv.push("Time,Temp,Gas,Air,RoR");
- minuteLog.forEach(m=>{
-   csv.push(`${m.time},${m.temp},${m.gas},${m.air},${m.ror}`);
- });
-
-// timeseries section
-csv.push("# TimeSeries");
-csv.push("Time,Temp,Gas,Air,RoR");
- // merge by time keys
- const map = {};
- tempData.forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].t = d.y; });
- gasData.forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].g = d.y; });
- airData.forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].a = d.y; });
- rorData.forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].r = d.y; });
- Object.keys(map).map(Number).sort((a,b)=>a-b).forEach(k=>{
-   const row = map[k];
-   csv.push(`${secToMinSec(k)},${row.t ?? ""},${row.g ?? ""},${row.a ?? ""},${row.r ?? ""}`);
- });
-
- const blob = new Blob([csv.join("\n")], {type:"text/csv"});
- const url = URL.createObjectURL(blob);
- const a = document.createElement("a");
- a.href = url;
- a.download = `roast_${Date.now()}.csv`;
- a.click();
- URL.revokeObjectURL(url);
+ const blob=new Blob([csv.join("\n")],{type:"text/csv"});
+ const url=URL.createObjectURL(blob);
+ const a=document.createElement("a");a.href=url;a.download="roast.csv";a.click();
 };
-
-// ===== CSV Import =====
-loadCsv.onchange = e => {
- const file = e.target.files[0];
- if(!file) return;
- const reader = new FileReader();
- reader.onload = ev => {
-   const text = ev.target.result;
-   // reset
-   tempData.length = gasData.length = airData.length = rorData.length = 0;
-   minuteLog.length = eventLog.length = 0;
-   document.querySelector("#logTable tbody").innerHTML = "";
-   document.querySelector("#eventTable tbody").innerHTML = "";
-   let lines = text.split(/\r?\n/);
-   let mode = ""; // "", "events","minutelog","timeseries"
-   lines.forEach(raw=>{
-     const line = raw.trim();
-     if(!line) return;
-     if(line.startsWith("#")){
-       // headers or section markers
-       if(line.startsWith("# Events") || line.toLowerCase().includes("events")) { mode = "events"; return; }
-       if(line.startsWith("# MinuteLog") || line.toLowerCase().includes("minutelog")) { mode = "minutelog"; return; }
-       if(line.startsWith("# TimeSeries") || line.toLowerCase().includes("timeseries")) { mode = "timeseries"; return; }
-       // meta phase times
-       if(line.startsWith("# Charge,")){ const v = line.split(",")[1]; chargeTime = v? minSecToSec(v): null; return; }
-       if(line.startsWith("# DryEnd,")){ const v = line.split(",")[1]; dryTime = v? minSecToSec(v): null; return; }
-       if(line.startsWith("# FirstCrack,")){ const v = line.split(",")[1]; fcTime = v? minSecToSec(v): null; return; }
-       if(line.startsWith("# Drop,")){ const v = line.split(",")[1]; dropTime = v? minSecToSec(v): null; return; }
-       // otherwise ignore header lines
-       return;
-     }
-     // skip CSV column header rows
-     if(line.match(/^(Time|Event),/i)) return;
-
-     const parts = line.split(",");
-     if(mode === "events"){
-       const [name, timeStr, tStr, gStr, aStr] = parts;
-       const tSec = minSecToSec(timeStr);
-       if(isFinite(tSec)){
-         eventLog.push({name, t: tSec, temp: tStr? Number(tStr):"", gas: gStr? Number(gStr):"", air: aStr? Number(aStr):""});
-         // append to table
-         const tr = document.createElement("tr");
-         tr.innerHTML = `<td>${name}</td><td>${timeStr}</td><td>${tStr||""}</td><td>${gStr||""}</td><td>${aStr||""}</td>`;
-         document.querySelector("#eventTable tbody").appendChild(tr);
-       }
-       return;
-     }
-     if(mode === "minutelog"){
-       const [timeStr, tStr, gStr, aStr, rStr] = parts;
-       const sec = minSecToSec(timeStr);
-       if(isFinite(sec)){
-         const m = Math.floor(sec/60);
-         const rec = {min: m, time: timeStr, temp: tStr||"", gas: gStr||"", air: aStr||"", ror: rStr||""};
-         minuteLog.push(rec);
-         const tr = document.createElement("tr");
-         tr.innerHTML = `<td>${timeStr}</td><td>${tStr||""}</td><td>${gStr||""}</td><td>${aStr||""}</td><td>${rStr||""}</td>`;
-         document.querySelector("#logTable tbody").appendChild(tr);
-       }
-       return;
-     }
-     // default: timeseries / or older file format -> treat as timeseries
-     const [timeStr, tStr, gStr, aStr, rStr] = parts;
-     const sec = minSecToSec(timeStr);
-     if(!isFinite(sec)) return;
-     if(tStr) tempData.push({x:sec, y: Number(tStr)});
-     if(gStr) gasData.push({x:sec, y: Number(gStr)});
-     if(aStr) airData.push({x:sec, y: Number(aStr)});
-     if(rStr) rorData.push({x:sec, y: Number(rStr)});
-   });
-
-   // finalize
-   startTime = Date.now();
-   if(!dropTime){
-     endTime = Math.max(0, ...(tempData.map(d=>d.x).concat(gasData.map(d=>d.x), airData.map(d=>d.x))));
-     if(!isFinite(endTime)) endTime = null;
-   } else {
-     endTime = dropTime;
-   }
-
-   // append loaded data to chart
-   draw();
- };
- reader.readAsText(file);
-};
-
-function minSecToSec(str){
- if(!str) return null;
- const v = str.trim();
- const parts = v.split(":").map(Number);
- if(parts.length!==2) return null;
- const [m,s] = parts;
- if(isNaN(m) || isNaN(s)) return null;
- return m*60 + s;
-}
-
-// initialize history dropdown
-updateHistory();
-<div id="bottomSpacer"></div>
 </script>
 </body>
 </html>
