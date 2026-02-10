@@ -202,10 +202,10 @@ const chart=new Chart(document.getElementById("chart"),{
  plugins:[phaseTextPlugin],
 type:"line",
  data:{datasets:[
-  {label:"Temp",data:[],borderWidth:2,borderColor:"#e53935",tension:.3,pointRadius:0},
-  {label:"Compare",data:[],borderDash:[6,4],borderColor:"#999",pointRadius:0},
-  {label:"RoR",data:[],yAxisID:"yRoR",borderWidth:2,borderColor:"#1e88e5",tension:.3,pointRadius:0},
-  {label:"Gas",data:[],yAxisID:"yR",borderDash:[4,4],borderColor:"#43a047"}
+ {label:"Temp",data:[],borderWidth:2,borderColor:"red",tension:.3,pointRadius:0},
+ {label:"Compare",data:[],borderDash:[6,4],borderColor:"#999",pointRadius:0},
+ {label:"RoR",data:[],yAxisID:"yRoR",borderWidth:2,borderColor:"blue",tension:.3,pointRadius:0},
+ {label:"Gas",data:[],yAxisID:"yR",borderDash:[4,4],borderColor:"green"}
 ]}
 ,
  options:{
@@ -287,35 +287,38 @@ function draw(){
  if(!startTime)return;
  const t=nowSec();
  time.textContent=fmt(t);
+
  chart.options.scales.x.max=Math.max(600,t+10);
+
  calcRoR();
  chart.data.datasets[0].data=tempData;
  chart.data.datasets[2].data=rorData;
  chart.data.datasets[3].data=gasData;
-// ===== フェーズライン =====
-if(!chart.options.plugins) chart.options.plugins={};
-if(!chart.options.plugins.annotation) chart.options.plugins.annotation={};
-chart.options.plugins.annotation.annotations={};
 
-const addLine=(key,time,label,color)=>{
- if(time==null) return;
- chart.options.plugins.annotation.annotations[key]={
-  type:"line",
-  xMin:time,xMax:time,
-  borderColor:color,
-  borderWidth:2,
-  label:{display:true,content:label}
+ // ===== フェーズライン =====
+ if(!chart.options.plugins) chart.options.plugins={};
+ if(!chart.options.plugins.annotation) chart.options.plugins.annotation={};
+ chart.options.plugins.annotation.annotations={};
+
+ const addLine=(key,time,label,color)=>{
+  if(time==null) return;
+  chart.options.plugins.annotation.annotations[key]={
+   type:"line",
+   xMin:time,xMax:time,
+   borderColor:color,
+   borderWidth:2,
+   label:{display:true,content:label}
+  };
  };
-};
 
-addLine("charge",chargeTime,"Charge","blue");
-addLine("tp",tpTime,"TP","purple");
-addLine("dry",dryTime,"Dry End","orange");
-addLine("fc",fcTime,"1st Crack","red");
-addLine("drop",dropTime,"Drop","black");
+ addLine("charge",chargeTime,"Charge","blue");
+ addLine("tp",tpTime,"TP","purple");
+ addLine("dry",dryTime,"Dry End","orange");
+ addLine("fc",fcTime,"1st Crack","red");
+ addLine("drop",dropTime,"Drop","black");
+
  updateLogTable();
-}
-chart.update();
+ chart.update();
 }
 /* ===== 操作 ===== */
 startBtn.onclick=()=>{
@@ -415,21 +418,25 @@ document.querySelectorAll("input").forEach(el=>{
 });
 
 csvBtn.onclick=()=>{
- let csv=[];
- csv.push("Time,Temp,Gas,RoR");
+ let csv=["Time,Temp,Gas,RoR"];
 
  for(let i=0;i<tempData.length;i++){
-   const t=tempData[i];
-   const g=gasData.find(d=>d.x==t.x);
-   const r=rorData.find(d=>d.x==t.x);
-   csv.push(`${secToMinSec(t.x)},${t.y},${g?g.y:""},${r?r.y:""}`);
+  const t=tempData[i];
+  const g=gasData.find(d=>d.x==t.x);
+  const r=rorData.find(d=>d.x==t.x);
+  csv.push(`${secToMinSec(t.x)},${t.y},${g?g.y:""},${r?r.y:""}`);
  }
 
- const blob=new Blob([csv.join("\n")],{type:"text/csv"});
+ const blob=new Blob([csv.join("\n")],{type:"text/csv;charset=utf-8;"});
+ const url=URL.createObjectURL(blob);
+
  const a=document.createElement("a");
- a.href=URL.createObjectURL(blob);
+ a.href=url;
  a.download="roast_log.csv";
+ document.body.appendChild(a);
  a.click();
+ document.body.removeChild(a);
+ URL.revokeObjectURL(url);
 };
 
 </script>
