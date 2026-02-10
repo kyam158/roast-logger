@@ -89,6 +89,13 @@ body.ipad #chartWrap{height:48vh}
 #dbResults{max-height:240px;overflow:auto;margin-top:6px;border:1px solid #ddd;background:#fff}
 #dbResults table{font-size:12px}
 #dbStats{background:#fff;padding:8px;border:1px solid #eee;margin-top:6px}
+
+/* history list styling */
+#historyListWrap{margin-top:6px;border:1px solid #eee;padding:6px;background:#fff;max-height:220px;overflow:auto}
+.history-item{display:flex;gap:6px;align-items:center;padding:6px;border-bottom:1px solid #f4f4f4}
+.history-item:last-child{border-bottom:none}
+.history-item .label{flex:1;font-size:13px}
+.history-actions button{margin-left:6px;padding:6px 8px;font-size:12px}
 </style>
 </head>
 
@@ -160,7 +167,7 @@ body.ipad #chartWrap{height:48vh}
       <button id="csvBtn">CSV Export</button>
       <input id="loadCsv" type="file" accept=".csv">
 
-      <!-- 履歴セレクト + 履歴操作 -->
+      <!-- 履歴セレクト + 履歴操作（元の互換性を残す） -->
       <div class="history-controls">
         <select id="historySelect"><option value="">履歴</option></select>
         <button id="exportHistoryBtn">Export Selected</button>
@@ -169,6 +176,11 @@ body.ipad #chartWrap{height:48vh}
         <input id="historyName" placeholder="履歴名 (編集)" />
         <button id="renameHistoryBtn">Rename</button>
         <button id="deleteHistoryBtn">Delete Selected</button>
+      </div>
+
+      <!-- チェックボックス方式の履歴リスト（B方式） -->
+      <div id="historyListWrap" aria-label="履歴リスト（複数選択可）">
+        <div id="historyList"><!-- JS で埋める --></div>
       </div>
 
       <!-- 比較セレクト -->
@@ -519,7 +531,7 @@ document.getElementById("dropBtn").onclick = () => {
 
 /* ====== 履歴/CSV/比較の既存機能（保持） ====== */
 /* saveHistory, updateHistory, historySelect onchange, exportSnapshot, delete, rename, compareSelect, csv export, import... */
-/* （ここは既存と同じコードを動かすため省略しないでそのまま置いています） */
+/* 以下に updateHistory と delete をチェックボックス対応へ変更（他は維持） */
 
 /* saveHistory: 履歴を localStorage に保存 */
 function saveHistory(){
@@ -548,21 +560,79 @@ function saveHistory(){
  updateHistory();
 }
 
-/* updateHistory: セレクトを再構築 */
+/* updateHistory: セレクトを再構築 + チェックリスト（historyList）を更新 */
 function updateHistory(){
  const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
  const sel = document.getElementById("historySelect");
  const cmp = document.getElementById("compareSelect");
+ const listWrap = document.getElementById("historyList");
  sel.innerHTML = '<option value="">履歴</option>';
  cmp.innerHTML = '<option value="">比較（Compare）</option>';
+ listWrap.innerHTML = '';
+ if(!h.length){
+   // show placeholder
+   const ph = document.createElement("div");
+   ph.style.color = "#777";
+   ph.style.fontSize = "13px";
+   ph.style.padding = "8px";
+   ph.textContent = "保存された履歴はありません";
+   listWrap.appendChild(ph);
+   return;
+ }
  h.forEach((r,i)=>{
   const label = r.title ? `Roast ${i+1} - ${r.title}` : `Roast ${i+1} (${new Date(r.savedAt).toLocaleString()})`;
+
+  // update selects
   const o = document.createElement("option"); o.value = i; o.textContent = label; sel.appendChild(o);
   const o2 = document.createElement("option"); o2.value = i; o2.textContent = label; cmp.appendChild(o2);
+
+  // build checkbox list item
+  const row = document.createElement("div");
+  row.className = "history-item";
+  row.innerHTML = `
+    <input type="checkbox" class="history-chk" data-idx="${i}">
+    <div class="label">${label}</div>
+    <div class="history-actions">
+      <button class="history-load" data-idx="${i}" title="Load">Load</button>
+      <button class="history-compare" data-idx="${i}" title="Compare">Compare</button>
+      <button class="history-export" data-idx="${i}" title="Export">Export</button>
+    </div>
+  `;
+  listWrap.appendChild(row);
+ });
+
+ // attach handlers for the dynamic buttons (load/compare/export)
+ Array.from(document.querySelectorAll(".history-load")).forEach(b=>{
+   b.onclick = e => {
+     const idx = e.currentTarget.getAttribute("data-idx");
+     document.getElementById("historySelect").value = idx;
+     document.getElementById("historySelect").dispatchEvent(new Event('change'));
+   };
+ });
+ Array.from(document.querySelectorAll(".history-compare")).forEach(b=>{
+   b.onclick = e => {
+     const idx = e.currentTarget.getAttribute("data-idx");
+     const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+     const s = h[idx];
+     if(!s) return alert("履歴が見つかりません");
+     chart.data.datasets[4].data = (s.tempData||[]).map(d=>({x:d.x,y:d.y}));
+     chart.data.datasets[4].hidden = false;
+     document.getElementById("compareSelect").value = idx;
+     chart.update();
+   };
+ });
+ Array.from(document.querySelectorAll(".history-export")).forEach(b=>{
+   b.onclick = e => {
+     const idx = e.currentTarget.getAttribute("data-idx");
+     const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+     const s = h[idx];
+     if(!s) return alert("履歴が見つかりません");
+     exportSnapshot(s);
+   };
  });
 }
 
-/* historySelect onchange: 履歴を読み込む */
+/* historySelect onchange: 履歴を読み込む (既存ロジックそのまま) */
 document.getElementById("historySelect").onchange = () => {
  const idx = document.getElementById("historySelect").value;
  if(idx === "") return;
@@ -666,20 +736,37 @@ function exportSnapshot(s){
  URL.revokeObjectURL(url);
 }
 
-/* Delete selected snapshot */
+/* Delete selected snapshot(s) — チェックボックス方式 */
 document.getElementById("deleteHistoryBtn").onclick = () => {
- const idx = document.getElementById("historySelect").value;
- if(idx === "") return alert("削除する履歴を選んでください");
- if(!confirm("選択された履歴を削除しますか？")) return;
- const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
- h.splice(idx,1);
- localStorage.setItem("roastHistory", JSON.stringify(h));
- updateHistory();
- document.getElementById("historySelect").value = "";
- document.getElementById("historyName").value = "";
+  // collect checked checkboxes
+  const checks = Array.from(document.querySelectorAll(".history-chk")).filter(c=>c.checked);
+  if(checks.length === 0) {
+    // fallback: if none checked, keep single-delete compatibility with select
+    const idx = document.getElementById("historySelect").value;
+    if(idx === "") return alert("削除する履歴を選んでください");
+    if(!confirm("選択された履歴を削除しますか？")) return;
+    const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+    h.splice(idx,1);
+    localStorage.setItem("roastHistory", JSON.stringify(h));
+    updateHistory();
+    document.getElementById("historySelect").value = "";
+    document.getElementById("historyName").value = "";
+    return;
+  }
+  if(!confirm(`${checks.length} 件の履歴を削除します。よろしいですか？`)) return;
+  const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+  const idxs = checks.map(c=>parseInt(c.getAttribute("data-idx"),10)).filter(n=>!isNaN(n)).sort((a,b)=>b-a);
+  idxs.forEach(i=>{
+    if(i>=0 && i < h.length) h.splice(i,1);
+  });
+  localStorage.setItem("roastHistory", JSON.stringify(h));
+  updateHistory();
+  document.getElementById("historySelect").value = "";
+  document.getElementById("historyName").value = "";
+  alert(`${idxs.length} 件の履歴を削除しました`);
 };
 
-/* Rename selected snapshot */
+/* Rename selected snapshot (select-based, keep existing) */
 document.getElementById("renameHistoryBtn").onclick = () => {
  const idx = document.getElementById("historySelect").value;
  if(idx === "") return alert("編集する履歴を選んでください");
@@ -692,7 +779,7 @@ document.getElementById("renameHistoryBtn").onclick = () => {
  document.getElementById("historySelect").value = idx;
 };
 
-/* Compare: overlay tempData from selected snapshot */
+/* Compare select handler (unchanged) */
 document.getElementById("compareSelect").onchange = () => {
  const idx = document.getElementById("compareSelect").value;
  const compDataset = chart.data.datasets[4]; // Compare dataset
@@ -1007,7 +1094,7 @@ document.getElementById("searchDbBtn").onclick = () => {
   searchRoastHistory();
 };
 
-/* Initialize history dropdown on load */
+/* Initialize history dropdown & checkbox list on load */
 updateHistory();
 
 /* expose for debugging (optional) */
@@ -1015,4 +1102,4 @@ window._roast_search = { searchRoastHistory, renderSearchResults, computePhasesF
 
 </script>
 </body>
-</html> 
+</html>
