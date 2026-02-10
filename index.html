@@ -90,12 +90,42 @@ body.ipad #chartWrap{height:48vh}
 #dbResults table{font-size:12px}
 #dbStats{background:#fff;padding:8px;border:1px solid #eee;margin-top:6px}
 
-/* history list styling */
+/* history list styling + more visible checkboxes */
 #historyListWrap{margin-top:6px;border:1px solid #eee;padding:6px;background:#fff;max-height:220px;overflow:auto}
-.history-item{display:flex;gap:6px;align-items:center;padding:6px;border-bottom:1px solid #f4f4f4}
+.history-item{display:flex;gap:8px;align-items:center;padding:6px;border-bottom:1px solid #f4f4f4}
 .history-item:last-child{border-bottom:none}
 .history-item .label{flex:1;font-size:13px}
+
+/* make checkboxes big & colored so they stand out */
+.history-chk{
+  transform: scale(1.4);
+  margin-right:8px;
+  accent-color:#1976d2;
+  width:20px;
+  height:20px;
+  box-shadow:0 1px 3px rgba(0,0,0,0.12);
+}
+
+/* "select all" buttons */
+#historyControlsRow{display:flex;gap:6px;margin-bottom:6px}
+#historyControlsRow button{flex:1;padding:8px;font-size:13px}
+
+/* temp cell editable visual */
+.temp-cell[contenteditable="true"]{
+  background: #fff9e6;
+  border:1px dashed #f0c040;
+  padding:4px;
+  outline: none;
+}
+
+/* small action buttons in list */
 .history-actions button{margin-left:6px;padding:6px 8px;font-size:12px}
+.panel-toggle{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.panel-toggle button{padding:8px;font-size:13px}
+.collapsible{transition:all .18s ease}
+
+/* small helper */
+.small-muted{font-size:12px;color:#666;margin-top:4px}
 </style>
 </head>
 
@@ -119,6 +149,7 @@ body.ipad #chartWrap{height:48vh}
         <thead><tr><th>Event</th><th>Time</th><th>Temp</th><th>Gas</th><th>Air</th></tr></thead>
         <tbody></tbody>
       </table>
+      <div class="small-muted">※ Temp 列は焙煎完了（Drop）後に編集可能になります</div>
     </div>
   </div>
 
@@ -178,6 +209,12 @@ body.ipad #chartWrap{height:48vh}
         <button id="deleteHistoryBtn">Delete Selected</button>
       </div>
 
+      <!-- check controls: select all / clear -->
+      <div id="historyControlsRow">
+        <button id="selectAllHistoryBtn">全選択</button>
+        <button id="clearAllHistoryBtn">選択解除</button>
+      </div>
+
       <!-- チェックボックス方式の履歴リスト（B方式） -->
       <div id="historyListWrap" aria-label="履歴リスト（複数選択可）">
         <div id="historyList"><!-- JS で埋める --></div>
@@ -189,40 +226,50 @@ body.ipad #chartWrap{height:48vh}
         <button id="clearCompareBtn">Clear Compare</button>
       </div>
 
-      <!-- ===== DB Search UI (追加) ===== -->
-      <h3>DB Search</h3>
-      <label>Country</label><input id="filterCountry" placeholder="例：Ethiopia">
-      <label>Farm</label><input id="filterFarm" placeholder="例：Yirgacheffe">
-      <label>Variety</label><input id="filterVariety" placeholder="例：Heirloom">
-      <label>Process</label><input id="filterProcess" placeholder="Washed / Natural">
-      <div class="row">
-        <input id="filterAltMin" type="number" placeholder="alt min (m)">
-        <input id="filterAltMax" type="number" placeholder="alt max (m)">
+      <!-- ===== DB Search UI (追加) - collapsible ===== -->
+      <div class="panel-toggle">
+        <h3 style="margin:0">DB Search</h3>
+        <button id="toggleDbBtn" aria-expanded="true">折りたたむ</button>
       </div>
-      <div class="row">
-        <input id="filterDateFrom" type="date" placeholder="from">
-        <input id="filterDateTo" type="date" placeholder="to">
-      </div>
-      <div class="row">
-        <button id="searchDbBtn">Search DB</button>
-        <button id="clearFilterBtn">Clear</button>
+      <div id="dbSearchPanel" class="collapsible">
+        <label>Country</label><input id="filterCountry" placeholder="例：Ethiopia">
+        <label>Farm</label><input id="filterFarm" placeholder="例：Yirgacheffe">
+        <label>Variety</label><input id="filterVariety" placeholder="例：Heirloom">
+        <label>Process</label><input id="filterProcess" placeholder="Washed / Natural">
+        <div class="row">
+          <input id="filterAltMin" type="number" placeholder="alt min (m)">
+          <input id="filterAltMax" type="number" placeholder="alt max (m)">
+        </div>
+        <div class="row">
+          <input id="filterDateFrom" type="date" placeholder="from">
+          <input id="filterDateTo" type="date" placeholder="to">
+        </div>
+        <div class="row">
+          <button id="searchDbBtn">Search DB</button>
+          <button id="clearFilterBtn">Clear</button>
+        </div>
+        <div id="dbStats" aria-live="polite" style="display:none"></div>
+        <div id="dbResults" style="display:none">
+          <table id="dbTable">
+            <thead><tr><th>#</th><th>Date</th><th>Country</th><th>Farm</th><th>Variety</th><th>Process</th><th>Alt</th><th>Dev%</th><th>Actions</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </div>
 
-      <div id="dbStats" aria-live="polite" style="display:none"></div>
-      <div id="dbResults" style="display:none">
-        <table id="dbTable">
-          <thead><tr><th>#</th><th>Date</th><th>Country</th><th>Farm</th><th>Variety</th><th>Process</th><th>Alt</th><th>Dev%</th><th>Actions</th></tr></thead>
-          <tbody></tbody>
-        </table>
+      <!-- Green Bean Info - collapsible -->
+      <div class="panel-toggle" style="margin-top:8px">
+        <h3 style="margin:0">Green Bean Info</h3>
+        <button id="toggleGreenBtn" aria-expanded="true">折りたたむ</button>
       </div>
-
-      <h3>Green Bean Info</h3>
-      <label>日付</label><input id="metaDate" type="date">
-      <label>国</label><input id="metaCountry">
-      <label>農園</label><input id="metaFarm">
-      <label>品種</label><input id="metaVariety">
-      <label>プロセス</label><input id="metaProcess">
-      <label>標高</label><input id="metaAltitude" type="number" inputmode="numeric" pattern="[0-9]*">
+      <div id="greenBeanPanel" class="collapsible">
+        <label>日付</label><input id="metaDate" type="date">
+        <label>国</label><input id="metaCountry">
+        <label>農園</label><input id="metaFarm">
+        <label>品種</label><input id="metaVariety">
+        <label>プロセス</label><input id="metaProcess">
+        <label>標高</label><input id="metaAltitude" type="number" inputmode="numeric" pattern="[0-9]*">
+      </div>
 
       <div id="bottomSpacer"></div>
     </div>
@@ -354,6 +401,37 @@ function calcRoR(){
  }
 }
 
+/* helper: create event table row for given event object and index */
+function createEventRow(ev, idx){
+  const tbody = document.querySelector("#eventTable tbody");
+  const tr = document.createElement("tr");
+  tr.dataset.idx = idx;
+  // temp cell editable only if dropTime already set
+  const editable = (dropTime != null);
+  const tempVal = (ev.temp!=="" && ev.temp!==undefined) ? ev.temp : "";
+  tr.innerHTML = `<td>${ev.name}</td>
+    <td>${secToMinSec(ev.t)}</td>
+    <td class="temp-cell" contenteditable="${editable ? "true" : "false"}">${tempVal}</td>
+    <td>${ev.gas!==""?ev.gas:""}</td>
+    <td>${ev.air!==""?ev.air:""}</td>`;
+  tbody.appendChild(tr);
+
+  // when editable, update eventLog on blur
+  const tempTd = tr.querySelector(".temp-cell");
+  tempTd.addEventListener("blur", ()=>{
+    const text = tempTd.textContent.trim();
+    const n = parseFloat(text);
+    if(!isNaN(n)){
+      eventLog[idx].temp = n;
+      tempTd.textContent = n;
+    } else {
+      // if non-numeric, keep as-is string or empty
+      eventLog[idx].temp = text === "" ? "" : text;
+    }
+  });
+}
+
+/* Event log */
 function addEventLog(name){
  const t = nowSec();
  const tempRec = [...tempData].reverse().find(d=>d.x<=t);
@@ -366,13 +444,21 @@ function addEventLog(name){
   gas: gasRec ? Number(gasRec.y) : (gas? Number(gas) : ""),
   air: airRec ? Number(airRec.y) : (air? Number(air) : "")
  };
+ // push then create row so index matches
  eventLog.push(JSON.parse(JSON.stringify(rec)));
- const tbody = document.querySelector("#eventTable tbody");
- const tr = document.createElement("tr");
- tr.innerHTML = `<td>${rec.name}</td><td>${secToMinSec(rec.t)}</td><td>${rec.temp!==""?rec.temp:""}</td><td>${rec.gas!==""?rec.gas:""}</td><td>${rec.air!==""?rec.air:""}</td>`;
- tbody.appendChild(tr);
+ const idx = eventLog.length - 1;
+ createEventRow(rec, idx);
 }
 
+/* When roast finished (drop), enable editing for all existing temp cells */
+function enableEventTempEditing(){
+  document.querySelectorAll("#eventTable .temp-cell").forEach(td=>{
+    td.contentEditable = "true";
+    td.classList.add("editable-enabled");
+  });
+}
+
+/* Minute log */
 function updateMinuteLogIfNeeded(){
  if(!startTime) return;
  const s = nowSec();
@@ -521,19 +607,20 @@ fcBtn.onpointerdown = e => { e.preventDefault(); holdStart(()=>{ fcTime = nowSec
 
 document.getElementById("tpBtn").onclick = () => { tpTime = nowSec(); addEventLog("Turning Point"); draw(); };
 
+/* When Drop pressed: set dropTime, enable editing for temp cells, stop timer, save */
 document.getElementById("dropBtn").onclick = () => {
  dropTime = nowSec(); endTime = dropTime;
  addEventLog("Drop");
  clearInterval(timer);
+ // enable manual temp editing after roast finished
+ enableEventTempEditing();
  draw();
  saveHistory(); // 保存
 };
 
 /* ====== 履歴/CSV/比較の既存機能（保持） ====== */
 /* saveHistory, updateHistory, historySelect onchange, exportSnapshot, delete, rename, compareSelect, csv export, import... */
-/* 以下に updateHistory と delete をチェックボックス対応へ変更（他は維持） */
 
-/* saveHistory: 履歴を localStorage に保存 */
 function saveHistory(){
  const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
  const snapshot = {
@@ -560,7 +647,7 @@ function saveHistory(){
  updateHistory();
 }
 
-/* updateHistory: セレクトを再構築 + チェックリスト（historyList）を更新 */
+/* updateHistory: rebuild select and checkbox list */
 function updateHistory(){
  const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
  const sel = document.getElementById("historySelect");
@@ -570,7 +657,6 @@ function updateHistory(){
  cmp.innerHTML = '<option value="">比較（Compare）</option>';
  listWrap.innerHTML = '';
  if(!h.length){
-   // show placeholder
    const ph = document.createElement("div");
    ph.style.color = "#777";
    ph.style.fontSize = "13px";
@@ -632,7 +718,7 @@ function updateHistory(){
  });
 }
 
-/* historySelect onchange: 履歴を読み込む (既存ロジックそのまま) */
+/* historySelect onchange: load snapshot */
 document.getElementById("historySelect").onchange = () => {
  const idx = document.getElementById("historySelect").value;
  if(idx === "") return;
@@ -657,9 +743,8 @@ document.getElementById("historySelect").onchange = () => {
  });
  if(r.eventLog) r.eventLog.forEach(ev=>{
    eventLog.push(ev);
-   const tr = document.createElement("tr");
-   tr.innerHTML = `<td>${ev.name}</td><td>${secToMinSec(ev.t)}</td><td>${ev.temp}</td><td>${ev.gas}</td><td>${ev.air}</td>`;
-   document.querySelector("#eventTable tbody").appendChild(tr);
+   const idxNow = eventLog.length-1;
+   createEventRow(ev, idxNow);
  });
  // restore meta
  if(r.meta){
@@ -673,7 +758,11 @@ document.getElementById("historySelect").onchange = () => {
  document.getElementById("historyName").value = r.title || "";
  tpTime = r.tpTime; dryTime = r.dryTime; fcTime = r.fcTime; dropTime = r.dropTime;
  startTime = Date.now();
- if(dropTime) endTime = dropTime; else endTime = null;
+ if(dropTime) {
+   endTime = dropTime;
+   // allow editing after loading a finished roast
+   enableEventTempEditing();
+ } else endTime = null;
  lastMinuteLogged = minuteLog.length? minuteLog[minuteLog.length-1].min : -1;
  draw();
 };
@@ -738,10 +827,8 @@ function exportSnapshot(s){
 
 /* Delete selected snapshot(s) — チェックボックス方式 */
 document.getElementById("deleteHistoryBtn").onclick = () => {
-  // collect checked checkboxes
   const checks = Array.from(document.querySelectorAll(".history-chk")).filter(c=>c.checked);
   if(checks.length === 0) {
-    // fallback: if none checked, keep single-delete compatibility with select
     const idx = document.getElementById("historySelect").value;
     if(idx === "") return alert("削除する履歴を選んでください");
     if(!confirm("選択された履歴を削除しますか？")) return;
@@ -766,7 +853,15 @@ document.getElementById("deleteHistoryBtn").onclick = () => {
   alert(`${idxs.length} 件の履歴を削除しました`);
 };
 
-/* Rename selected snapshot (select-based, keep existing) */
+/* Select All / Clear All buttons for checkboxes */
+document.getElementById("selectAllHistoryBtn").onclick = () => {
+  document.querySelectorAll(".history-chk").forEach(c=>c.checked = true);
+};
+document.getElementById("clearAllHistoryBtn").onclick = () => {
+  document.querySelectorAll(".history-chk").forEach(c=>c.checked = false);
+};
+
+/* Rename selected snapshot (select-based) */
 document.getElementById("renameHistoryBtn").onclick = () => {
  const idx = document.getElementById("historySelect").value;
  if(idx === "") return alert("編集する履歴を選んでください");
@@ -779,10 +874,10 @@ document.getElementById("renameHistoryBtn").onclick = () => {
  document.getElementById("historySelect").value = idx;
 };
 
-/* Compare select handler (unchanged) */
+/* Compare select handler */
 document.getElementById("compareSelect").onchange = () => {
  const idx = document.getElementById("compareSelect").value;
- const compDataset = chart.data.datasets[4]; // Compare dataset
+ const compDataset = chart.data.datasets[4];
  if(idx === ""){
    compDataset.data = [];
    compDataset.hidden = true;
@@ -861,7 +956,7 @@ document.getElementById("csvBtn").onclick = () => {
  URL.revokeObjectURL(url);
 };
 
-/* CSV Import: loadCsv input handler (existing) */
+/* CSV Import: loadCsv input handler (existing) with createEventRow use */
 document.getElementById("loadCsv").onchange = e => {
  const file = e.target.files[0];
  if(!file) return;
@@ -902,9 +997,8 @@ document.getElementById("loadCsv").onchange = e => {
        if(isFinite(tSec)){
          const ev = { name, t: tSec, temp: tStr? Number(tStr):"", gas: gStr? Number(gStr):"", air: aStr? Number(aStr):"" };
          eventLog.push(ev);
-         const tr = document.createElement("tr");
-         tr.innerHTML = `<td>${ev.name}</td><td>${timeStr}</td><td>${ev.temp}</td><td>${ev.gas}</td><td>${ev.air}</td>`;
-         document.querySelector("#eventTable tbody").appendChild(tr);
+         const idxNow = eventLog.length-1;
+         createEventRow(ev, idxNow);
        }
        return;
      }
@@ -936,6 +1030,7 @@ document.getElementById("loadCsv").onchange = e => {
      if(!isFinite(endTime)) endTime = null;
    } else {
      endTime = dropTime;
+     enableEventTempEditing();
    }
    lastMinuteLogged = minuteLog.length? minuteLog[minuteLog.length-1].min : -1;
    draw();
@@ -945,9 +1040,7 @@ document.getElementById("loadCsv").onchange = e => {
 
 /* ========== ここから DB 検索 / 統計機能 ========== */
 
-/* helper: compute dev% (and drying/maillard) for snapshot */
 function computePhasesForSnapshot(s){
-  // use tpTime/dryTime/fcTime/dropTime stored in snapshot
   const tp = s.tpTime, dry = s.dryTime, fc = s.fcTime, drop = s.dropTime;
   if(tp==null || dry==null || fc==null || drop==null) return null;
   const drying = dry - tp;
@@ -963,7 +1056,6 @@ function computePhasesForSnapshot(s){
   };
 }
 
-/* search DB with filters from UI */
 function searchRoastHistory(){
   const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
   const fCountry = (document.getElementById("filterCountry").value || "").trim().toLowerCase();
@@ -1004,7 +1096,6 @@ function searchRoastHistory(){
   renderSearchResults(results);
 }
 
-/* render results table & stats */
 function renderSearchResults(results){
   const container = document.getElementById("dbResults");
   const tbody = document.querySelector("#dbTable tbody");
@@ -1049,7 +1140,7 @@ function renderSearchResults(results){
   statsNode.style.display = "block";
   statsNode.innerHTML = `<strong>Results:</strong> ${results.length} &nbsp; <strong>Avg Dev%</strong>: ${avgDev}% &nbsp; <strong>Avg Dry%</strong>: ${avgDry}% &nbsp; <strong>Avg Maillard%</strong>: ${avgMail}%`;
 
-  // attach handlers (delegation would be fine, but keep simple)
+  // attach handlers
   Array.from(document.querySelectorAll(".db-load")).forEach(b=>{
     b.onclick = e => {
       const idx = e.currentTarget.getAttribute("data-idx");
@@ -1094,8 +1185,30 @@ document.getElementById("searchDbBtn").onclick = () => {
   searchRoastHistory();
 };
 
+/* Toggle collapsible panels */
+document.getElementById("toggleDbBtn").onclick = () => {
+  const panel = document.getElementById("dbSearchPanel");
+  const btn = document.getElementById("toggleDbBtn");
+  const isOpen = btn.getAttribute("aria-expanded") === "true";
+  btn.setAttribute("aria-expanded", (!isOpen).toString());
+  btn.textContent = isOpen ? "展開" : "折りたたむ";
+  panel.style.display = isOpen ? "none" : "block";
+};
+document.getElementById("toggleGreenBtn").onclick = () => {
+  const panel = document.getElementById("greenBeanPanel");
+  const btn = document.getElementById("toggleGreenBtn");
+  const isOpen = btn.getAttribute("aria-expanded") === "true";
+  btn.setAttribute("aria-expanded", (!isOpen).toString());
+  btn.textContent = isOpen ? "展開" : "折りたたむ";
+  panel.style.display = isOpen ? "none" : "block";
+};
+
 /* Initialize history dropdown & checkbox list on load */
 updateHistory();
+
+/* If panels should start visible (they do) ensure display set */
+document.getElementById("dbSearchPanel").style.display = 'block';
+document.getElementById("greenBeanPanel").style.display = 'block';
 
 /* expose for debugging (optional) */
 window._roast_search = { searchRoastHistory, renderSearchResults, computePhasesForSnapshot };
