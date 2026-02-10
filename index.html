@@ -143,6 +143,7 @@ body.iphone #panel{
 </div>
 
 <script>
+Chart.register(window['chartjs-plugin-annotation']);
 /* ===== Device判定 ===== */
 const isIPad =
  navigator.userAgent.includes("iPad") ||
@@ -196,8 +197,6 @@ const phaseTextPlugin = {
   }
 };
 
-// Chart にプラグインを登録してから Chart 初期化（下の const chart = ... の直前に置いてください）
-Chart.register(phaseTextPlugin);
 /* ===== Chart ===== */
 const chart=new Chart(document.getElementById("chart"),{
  plugins:[phaseTextPlugin],
@@ -208,6 +207,7 @@ type:"line",
   {label:"RoR",data:[],yAxisID:"yRoR",borderWidth:2,borderColor:"#1e88e5",tension:.3,pointRadius:0},
   {label:"Gas",data:[],yAxisID:"yR",borderDash:[4,4],borderColor:"#43a047"}
 ]}
+,
  options:{
   animation:false,
   scales:{
@@ -314,23 +314,6 @@ addLine("dry",dryTime,"Dry End","orange");
 addLine("fc",fcTime,"1st Crack","red");
 addLine("drop",dropTime,"Drop","black");
  updateLogTable();
-const ratio = calcPhaseRatio();
-if(ratio){
- chart.options.plugins.title = {
-  display:true,
-  text:`Drying ${ratio.drying}% | Maillard ${ratio.maillard}% | Development ${ratio.dev}%`
- };
-
- document.getElementById("phaseText").innerHTML =
-  `Drying ${ratio.drying}% ｜ Maillard ${ratio.maillard}% ｜ Development ${ratio.dev}%`;
-}
-// フェーズ比率テキスト表示（グラフ上）
-const ratio = calcPhaseRatio();
-if(ratio){
-  chart.options.plugins.title = {
-    display:true,
-    text:`Drying ${ratio.drying}% | Maillard ${ratio.maillard}% | Dev ${ratio.dev}% (${ratio.devTime})`
-  };
 }
 chart.update();
 }
@@ -340,11 +323,12 @@ startBtn.onclick=()=>{
  temp=startTemp;
  startTime=Date.now();endTime=null;
 
- // リセット
  tempData.length=0;
  gasData.length=0;
  rorData.length=0;
  chargeTime=tpTime=dryTime=fcTime=dropTime=null;
+
+ chart.data.datasets.forEach(d=>d.data=[]);
 
  document.querySelector("#eventTable tbody").innerHTML="";
  tempData.push({x:0,y:startTemp});
@@ -354,7 +338,6 @@ startBtn.onclick=()=>{
  timer=setInterval(draw,1000);
  draw();
 };
-
 tempSet.onclick=()=>{
  temp=parseInt(tempInput.value)||temp;
  tempData.push({x:nowSec(),y:temp});
@@ -412,7 +395,8 @@ dropBtn.onclick=()=>{
 
  const ratio = calcPhaseRatio();
  if(ratio){
-  alert(`Drying ${ratio.drying}% / Maillard ${ratio.maillard}% / Dev ${ratio.dev}%`);
+  document.getElementById("phaseText").innerHTML =
+   `Drying ${ratio.drying}% ｜ Maillard ${ratio.maillard}% ｜ Development ${ratio.dev}% (${ratio.devTime})`;
  }
 };
 /* iOSキーボード固定防止 */
