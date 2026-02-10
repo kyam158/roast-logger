@@ -112,6 +112,12 @@ thead{position:sticky;top:0;background:#000;color:#fff}
   <button id="deleteHistoryBtn">Delete Selected</button>
 </div>
 
+<!-- 比較セレクト（追加） -->
+<div class="history-controls">
+  <select id="compareSelect"><option value="">比較（Compare）</option></select>
+  <button id="clearCompareBtn">Clear Compare</button>
+</div>
+
 <h3>Green Bean Info</h3>
 <label>日付</label><input id="metaDate" type="date">
 <label>国</label><input id="metaCountry">
@@ -154,10 +160,8 @@ const nowSec = ()=> endTime ?? Math.floor((Date.now()-startTime)/1000);
 const phaseOverlayPlugin = {
   id: 'phaseOverlay',
   afterDraw(chart){
-    // only draw when we have a chart canvas
     const ctx = chart.ctx;
     const area = chart.chartArea;
-    // calculate ratio using current globals
     const ratio = (function(){
       if(tpTime==null || dryTime==null || fcTime==null || dropTime==null) return null;
       const drying = dryTime - tpTime;
@@ -179,18 +183,16 @@ const phaseOverlayPlugin = {
     ctx.textBaseline = "top";
 
     if(ratio){
-      // draw a pill background
       const text = `Dry ${ratio.dryingPct}%  |  Mail ${ratio.maillardPct}%  |  Dev ${ratio.devPct}% (${ratio.devTime})`;
       const x = area.left + 8;
       const y = area.top + 8;
-      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
       const w = ctx.measureText(text).width + 18;
       ctx.fillRect(x-6, y-6, w, 34);
       ctx.fillStyle = "#111";
       ctx.font = "bold 13px sans-serif";
       ctx.fillText(text, x, y);
     } else {
-      // If not complete, show partial markers (TP/Dry/1C)
       const parts = [];
       if(tpTime) parts.push(`TP ${secToMinSec(tpTime)}`);
       if(dryTime) parts.push(`Dry ${secToMinSec(dryTime)}`);
@@ -200,7 +202,7 @@ const phaseOverlayPlugin = {
         const text = parts.join(" | ");
         const x = area.left + 8;
         const y = area.top + 8;
-        ctx.fillStyle = "rgba(255,255,255,0.85)";
+        ctx.fillStyle = "rgba(255,255,255,0.9)";
         const w = ctx.measureText(text).width + 18;
         ctx.fillRect(x-6, y-6, w, 24);
         ctx.fillStyle = "#111";
@@ -212,7 +214,7 @@ const phaseOverlayPlugin = {
   }
 };
 
-/* Chart */
+/* Chart - NOTE: add 5th dataset for Compare (index 4) */
 const chart = new Chart(document.getElementById("chart"),{
   plugins:[phaseOverlayPlugin],
   type:"line",
@@ -220,7 +222,8 @@ const chart = new Chart(document.getElementById("chart"),{
     {label:"Temp",data:[],borderColor:"red",borderWidth:2,pointRadius:0},
     {label:"RoR",data:[],yAxisID:"yRoR",borderColor:"blue",borderWidth:2,pointRadius:0},
     {label:"Gas",data:[],yAxisID:"yGas",borderColor:"green",borderDash:[4,4],pointRadius:0},
-    {label:"Air",data:[],yAxisID:"yAir",borderColor:"cyan",borderDash:[2,2],pointRadius:0}
+    {label:"Air",data:[],yAxisID:"yAir",borderColor:"cyan",borderDash:[2,2],pointRadius:0},
+    {label:"Compare",data:[],borderColor:"#666",borderDash:[6,4],borderWidth:2,pointRadius:0,hidden:true}
   ]},
   options:{
     animation:false,
@@ -454,12 +457,13 @@ function saveHistory(){
 function updateHistory(){
  const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
  const sel = document.getElementById("historySelect");
+ const cmp = document.getElementById("compareSelect");
  sel.innerHTML = '<option value="">履歴</option>';
+ cmp.innerHTML = '<option value="">比較（Compare）</option>';
  h.forEach((r,i)=>{
-  const o = document.createElement("option");
-  o.value = i;
-  o.textContent = r.title ? `Roast ${i+1} - ${r.title}` : `Roast ${i+1} (${new Date(r.savedAt).toLocaleString()})`;
-  sel.appendChild(o);
+  const label = r.title ? `Roast ${i+1} - ${r.title}` : `Roast ${i+1} (${new Date(r.savedAt).toLocaleString()})`;
+  const o = document.createElement("option"); o.value = i; o.textContent = label; sel.appendChild(o);
+  const o2 = document.createElement("option"); o2.value = i; o2.textContent = label; cmp.appendChild(o2);
  });
 }
 
@@ -504,7 +508,7 @@ document.getElementById("historySelect").onchange = () => {
  tpTime = r.tpTime; dryTime = r.dryTime; fcTime = r.fcTime; dropTime = r.dropTime;
  startTime = Date.now();
  if(dropTime) endTime = dropTime; else endTime = null;
- lastMinuteLogged = minuteLog.length ? minuteLog[minuteLog.length-1].min : -1;
+ lastMinuteLogged = minuteLog.length? minuteLog[minuteLog.length-1].min : -1;
  draw();
 };
 
@@ -592,7 +596,37 @@ document.getElementById("renameHistoryBtn").onclick = () => {
  document.getElementById("historySelect").value = idx; // keep selection
 };
 
-// Save current snapshot quickly on demand (Ctrl-ish)
+// Compare feature: when user selects a snapshot in compareSelect, overlay its tempData
+document.getElementById("compareSelect").onchange = () => {
+ const idx = document.getElementById("compareSelect").value;
+ const compDataset = chart.data.datasets[4]; // Compare dataset
+ if(idx === ""){
+   compDataset.data = [];
+   compDataset.hidden = true;
+   chart.update();
+   return;
+ }
+ const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+ const r = h[idx];
+ if(!r) {
+   alert("選択された履歴が見つかりません");
+   return;
+ }
+ // map r.tempData to dataset (ensure {x,y})
+ compDataset.data = r.tempData.map(d => ({x: d.x, y: d.y}));
+ compDataset.hidden = false;
+ chart.update();
+};
+
+// Clear compare
+document.getElementById("clearCompareBtn").onclick = () => {
+ chart.data.datasets[4].data = [];
+ chart.data.datasets[4].hidden = true;
+ document.getElementById("compareSelect").value = "";
+ chart.update();
+};
+
+// Save current snapshot quickly on demand (Ctrl/Cmd+S)
 document.addEventListener("keydown", e => {
  if((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==="s"){
    e.preventDefault();
@@ -658,7 +692,7 @@ document.getElementById("csvBtn").onclick = () => {
  URL.revokeObjectURL(url);
 };
 
-// CSV import (supports our export format)
+// CSV import
 document.getElementById("loadCsv").onchange = e => {
  const file = e.target.files[0];
  if(!file) return;
@@ -671,7 +705,7 @@ document.getElementById("loadCsv").onchange = e => {
    document.querySelector("#logTable tbody").innerHTML = "";
    document.querySelector("#eventTable tbody").innerHTML = "";
    let lines = text.split(/\r?\n/);
-   let mode = ""; // "", "events","minutelog","timeseries"
+   let mode = "";
    lines.forEach(raw=>{
      const line = raw.trim();
      if(!line) return;
