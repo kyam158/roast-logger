@@ -200,13 +200,14 @@ const phaseTextPlugin = {
 Chart.register(phaseTextPlugin);
 /* ===== Chart ===== */
 const chart=new Chart(document.getElementById("chart"),{
- type:"line",
+ plugins:[phaseTextPlugin],
+type:"line",
  data:{datasets:[
-  {label:"Temp",data:[],borderWidth:2,tension:.3,pointRadius:0},
+  {label:"Temp",data:[],borderWidth:2,borderColor:"#e53935",tension:.3,pointRadius:0},
   {label:"Compare",data:[],borderDash:[6,4],borderColor:"#999",pointRadius:0},
-  {label:"RoR",data:[],yAxisID:"yRoR",borderWidth:2,tension:.3,pointRadius:0},
-  {label:"Gas",data:[],yAxisID:"yR",borderDash:[4,4]}
- ]},
+  {label:"RoR",data:[],yAxisID:"yRoR",borderWidth:2,borderColor:"#1e88e5",tension:.3,pointRadius:0},
+  {label:"Gas",data:[],yAxisID:"yR",borderDash:[4,4],borderColor:"#43a047"}
+]}
  options:{
   animation:false,
   scales:{
@@ -323,6 +324,14 @@ if(ratio){
  document.getElementById("phaseText").innerHTML =
   `Drying ${ratio.drying}% ｜ Maillard ${ratio.maillard}% ｜ Development ${ratio.dev}%`;
 }
+// フェーズ比率テキスト表示（グラフ上）
+const ratio = calcPhaseRatio();
+if(ratio){
+  chart.options.plugins.title = {
+    display:true,
+    text:`Drying ${ratio.drying}% | Maillard ${ratio.maillard}% | Dev ${ratio.dev}% (${ratio.devTime})`
+  };
+}
 chart.update();
 }
 /* ===== 操作 ===== */
@@ -330,10 +339,17 @@ startBtn.onclick=()=>{
  startTemp=parseInt(startTempInput.value)||150;
  temp=startTemp;
  startTime=Date.now();endTime=null;
- tempData.length=0;gasData.length=0;rorData.length=0;
+
+ // リセット
+ tempData.length=0;
+ gasData.length=0;
+ rorData.length=0;
+ chargeTime=tpTime=dryTime=fcTime=dropTime=null;
+
  document.querySelector("#eventTable tbody").innerHTML="";
  tempData.push({x:0,y:startTemp});
  gasData.push({x:0,y:gas});
+
  clearInterval(timer);
  timer=setInterval(draw,1000);
  draw();
@@ -413,6 +429,25 @@ document.querySelectorAll("input").forEach(el=>{
   window.scrollTo(0,scrollY);
  });
 });
+
+csvBtn.onclick=()=>{
+ let csv=[];
+ csv.push("Time,Temp,Gas,RoR");
+
+ for(let i=0;i<tempData.length;i++){
+   const t=tempData[i];
+   const g=gasData.find(d=>d.x==t.x);
+   const r=rorData.find(d=>d.x==t.x);
+   csv.push(`${secToMinSec(t.x)},${t.y},${g?g.y:""},${r?r.y:""}`);
+ }
+
+ const blob=new Blob([csv.join("\n")],{type:"text/csv"});
+ const a=document.createElement("a");
+ a.href=URL.createObjectURL(blob);
+ a.download="roast_log.csv";
+ a.click();
+};
+
 </script>
 </body>
 </html>
