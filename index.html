@@ -17,9 +17,6 @@ html,body{
   touch-action:manipulation;
   font-family:-apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI", Roboto, "Noto Sans JP", "Hiragino Kaku Gothic ProN", "メイリオ", sans-serif;
   background:#fafafa;
-  /* pull-to-refresh 対応ブラウザ向けの CSS 制御 */
-  overscroll-behavior-y: none;
-  -webkit-overflow-scrolling: auto;
 }
 #container{min-height:100vh;}
 
@@ -288,79 +285,6 @@ body.ipad #chartWrap{height:48vh}
   if(isIPad) document.body.classList.add("ipad");
 })();
 
-/* ===== pull-to-refresh 抑止（iPad/Safari 向け） =====
-   - 内部スクロールは妨げない
-   - ページ先頭での下方向スワイプ（引っ張り）だけ preventDefault する
-   - ただしボタンや input 等のインタラクティブ要素から始まるタッチは妨げない（CSV の保存などを保護）
-*/
-(function(){
-  if (!('ontouchstart' in window)) return;
-
-  let startY = 0;
-  let targetEl = null;
-
-  function findScrollable(el){
-    while(el && el !== document.body){
-      try{
-        const s = getComputedStyle(el);
-        if((s.overflowY === "auto" || s.overflowY === "scroll") &&
-           el.scrollHeight > el.clientHeight){
-          return el;
-        }
-      } catch(e){}
-      el = el.parentElement;
-    }
-    return null;
-  }
-
-  function isInteractiveOrActionable(el){
-    while(el){
-      if(el.nodeType !== 1){ el = el.parentElement; continue; }
-      const tn = el.tagName.toLowerCase();
-      if(['input','textarea','select','button','a','label'].includes(tn)) return true;
-      try{
-        if(el.getAttribute && (el.getAttribute('role') === 'button' || el.onclick)) return true;
-      } catch(e){}
-      el = el.parentElement;
-    }
-    return false;
-  }
-
-  document.addEventListener("touchstart", function(e){
-    startY = e.touches[0].clientY;
-    targetEl = e.target;
-  }, {passive:true});
-
-  document.addEventListener("touchmove", function(e){
-    if(!e.touches || e.touches.length === 0) return;
-    const y = e.touches[0].clientY;
-    const dy = y - startY;
-
-    // only consider downward pull
-    if(dy <= 0) return;
-
-    // If touch started on an interactive element (button/input/link), don't block it —
-    // allow the normal click/interaction to proceed.
-    if(isInteractiveOrActionable(targetEl)) return;
-
-    const scrollable = findScrollable(targetEl);
-
-    if(scrollable){
-      // if the scrollable element is not at top, allow normal scroll
-      if(scrollable.scrollTop > 0) return;
-      // if at top and pulling down, prevent default to stop pull-to-refresh
-      e.preventDefault();
-    } else {
-      const doc = document.scrollingElement || document.documentElement;
-      if(doc.scrollTop > 0) return;
-      // at document top and pulling down -> prevent
-      e.preventDefault();
-    }
-  }, {passive:false});
-})();
-</script>
-
-<script>
 /* ===== utils & state (元コードを維持) ===== */
 Chart.register(window['chartjs-plugin-annotation']);
 const fmt = s => `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
@@ -697,8 +621,587 @@ document.getElementById("dropBtn").onclick = () => {
 /* ====== 履歴/CSV/比較の既存機能（保持） ====== */
 /* saveHistory, updateHistory, historySelect onchange, exportSnapshot, delete, rename, compareSelect, csv export, import... */
 
-/* 以下、既存の関数群はそのまま（省略せず保持） */
-/* ...（上のまま全文が続きます） ... */
+function saveHistory(){
+ const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+ const snapshot = {
+  tempData: JSON.parse(JSON.stringify(tempData)),
+  gasData: JSON.parse(JSON.stringify(gasData)),
+  airData: JSON.parse(JSON.stringify(airData)),
+  rorData: JSON.parse(JSON.stringify(rorData)),
+  minuteLog: JSON.parse(JSON.stringify(minuteLog)),
+  eventLog: JSON.parse(JSON.stringify(eventLog)),
+  tpTime, dryTime, fcTime, dropTime,
+  meta: {
+   date: document.getElementById("metaDate").value || "",
+   country: document.getElementById("metaCountry").value || "",
+   farm: document.getElementById("metaFarm").value || "",
+   variety: document.getElementById("metaVariety").value || "",
+   process: document.getElementById("metaProcess").value || "",
+   altitude: document.getElementById("metaAltitude").value || ""
+  },
+  title: document.getElementById("historyName").value || "",
+  savedAt: new Date().toISOString()
+ };
+ h.push(snapshot);
+ localStorage.setItem("roastHistory", JSON.stringify(h));
+ updateHistory();
+}
+
+/* updateHistory: rebuild select and checkbox list */
+function updateHistory(){
+ const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+ const sel = document.getElementById("historySelect");
+ const cmp = document.getElementById("compareSelect");
+ const listWrap = document.getElementById("historyList");
+ sel.innerHTML = '<option value="">履歴</option>';
+ cmp.innerHTML = '<option value="">比較（Compare）</option>';
+ listWrap.innerHTML = '';
+ if(!h.length){
+   const ph = document.createElement("div");
+   ph.style.color = "#777";
+   ph.style.fontSize = "13px";
+   ph.style.padding = "8px";
+   ph.textContent = "保存された履歴はありません";
+   listWrap.appendChild(ph);
+   return;
+ }
+ h.forEach((r,i)=>{
+  const label = r.title ? `Roast ${i+1} - ${r.title}` : `Roast ${i+1} (${new Date(r.savedAt).toLocaleString()})`;
+
+  // update selects
+  const o = document.createElement("option"); o.value = i; o.textContent = label; sel.appendChild(o);
+  const o2 = document.createElement("option"); o2.value = i; o2.textContent = label; cmp.appendChild(o2);
+
+  // build checkbox list item
+  const row = document.createElement("div");
+  row.className = "history-item";
+  row.innerHTML = `
+    <input type="checkbox" class="history-chk" data-idx="${i}">
+    <div class="label">${label}</div>
+    <div class="history-actions">
+      <button class="history-load" data-idx="${i}" title="Load">Load</button>
+      <button class="history-compare" data-idx="${i}" title="Compare">Compare</button>
+      <button class="history-export" data-idx="${i}" title="Export">Export</button>
+    </div>
+  `;
+  listWrap.appendChild(row);
+ });
+
+ // attach handlers for the dynamic buttons (load/compare/export)
+ Array.from(document.querySelectorAll(".history-load")).forEach(b=>{
+   b.onclick = e => {
+     const idx = e.currentTarget.getAttribute("data-idx");
+     document.getElementById("historySelect").value = idx;
+     document.getElementById("historySelect").dispatchEvent(new Event('change'));
+   };
+ });
+ Array.from(document.querySelectorAll(".history-compare")).forEach(b=>{
+   b.onclick = e => {
+     const idx = e.currentTarget.getAttribute("data-idx");
+     const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+     const s = h[idx];
+     if(!s) return alert("履歴が見つかりません");
+     chart.data.datasets[4].data = (s.tempData||[]).map(d=>({x:d.x,y:d.y}));
+     chart.data.datasets[4].hidden = false;
+     document.getElementById("compareSelect").value = idx;
+     chart.update();
+   };
+ });
+ Array.from(document.querySelectorAll(".history-export")).forEach(b=>{
+   b.onclick = e => {
+     const idx = e.currentTarget.getAttribute("data-idx");
+     const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+     const s = h[idx];
+     if(!s) return alert("履歴が見つかりません");
+     exportSnapshot(s);
+   };
+ });
+}
+
+/* historySelect onchange: load snapshot */
+document.getElementById("historySelect").onchange = () => {
+ const idx = document.getElementById("historySelect").value;
+ if(idx === "") return;
+ const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+ const r = h[idx];
+ if(!r) return;
+ // restore arrays
+ tempData.length = 0; gasData.length = 0; airData.length = 0; rorData.length = 0;
+ r.tempData.forEach(d=>tempData.push(d));
+ r.gasData.forEach(d=>gasData.push(d));
+ r.airData.forEach(d=>airData.push(d));
+ r.rorData && r.rorData.forEach(d=>rorData.push(d));
+ // restore logs and tables
+ minuteLog.length = 0; eventLog.length = 0;
+ document.querySelector("#logTable tbody").innerHTML = "";
+ document.querySelector("#eventTable tbody").innerHTML = "";
+ if(r.minuteLog) r.minuteLog.forEach(m=>{
+   minuteLog.push(m);
+   const tr = document.createElement("tr");
+   tr.innerHTML = `<td>${m.time}</td><td>${m.temp}</td><td>${m.gas}</td><td>${m.air}</td><td>${m.ror}</td>`;
+   document.querySelector("#logTable tbody").appendChild(tr);
+ });
+ if(r.eventLog) r.eventLog.forEach(ev=>{
+   eventLog.push(ev);
+   const idxNow = eventLog.length-1;
+   createEventRow(ev, idxNow);
+ });
+ // restore meta
+ if(r.meta){
+  document.getElementById("metaDate").value = r.meta.date || "";
+  document.getElementById("metaCountry").value = r.meta.country || "";
+  document.getElementById("metaFarm").value = r.meta.farm || "";
+  document.getElementById("metaVariety").value = r.meta.variety || "";
+  document.getElementById("metaProcess").value = r.meta.process || "";
+  document.getElementById("metaAltitude").value = r.meta.altitude || "";
+ }
+ document.getElementById("historyName").value = r.title || "";
+ tpTime = r.tpTime; dryTime = r.dryTime; fcTime = r.fcTime; dropTime = r.dropTime;
+ startTime = Date.now();
+ if(dropTime) {
+   endTime = dropTime;
+   // allow editing after loading a finished roast
+   enableEventTempEditing();
+ } else endTime = null;
+ lastMinuteLogged = minuteLog.length? minuteLog[minuteLog.length-1].min : -1;
+ draw();
+};
+
+/* Export selected snapshot to CSV */
+document.getElementById("exportHistoryBtn").onclick = () => {
+ const idx = document.getElementById("historySelect").value;
+ if(idx === "") return alert("履歴を選んでください");
+ const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+ const s = h[idx];
+ if(!s) return alert("履歴が見つかりません");
+ exportSnapshot(s);
+};
+
+function exportSnapshot(s){
+ let csv = [];
+ csv.push("# Roast Logger CSV (export)");
+ csv.push("# SavedAt," + (s.savedAt||""));
+ if(s.meta){
+  csv.push(`# Date,${s.meta.date||""}`);
+  csv.push(`# Country,${s.meta.country||""}`);
+  csv.push(`# Farm,${s.meta.farm||""}`);
+  csv.push(`# Variety,${s.meta.variety||""}`);
+  csv.push(`# Process,${s.meta.process||""}`);
+  csv.push(`# Altitude,${s.meta.altitude||""}`);
+ }
+ if(s.tpTime!=null) csv.push(`# TP,${secToMinSec(s.tpTime)}`);
+ if(s.dryTime!=null) csv.push(`# DryEnd,${secToMinSec(s.dryTime)}`);
+ if(s.fcTime!=null) csv.push(`# FirstCrack,${secToMinSec(s.fcTime)}`);
+ if(s.dropTime!=null) csv.push(`# Drop,${secToMinSec(s.dropTime)}`);
+
+ csv.push("# Events");
+ csv.push("Event,Time,Temp,Gas,Air");
+ (s.eventLog||[]).forEach(ev=>{
+  csv.push(`${ev.name},${secToMinSec(ev.t)},${ev.temp},${ev.gas},${ev.air}`);
+ });
+ csv.push("# MinuteLog");
+ csv.push("Time,Temp,Gas,Air,RoR");
+ (s.minuteLog||[]).forEach(m=>{
+  csv.push(`${m.time},${m.temp},${m.gas},${m.air},${m.ror}`);
+ });
+ csv.push("# TimeSeries");
+ csv.push("Time,Temp,Gas,Air,RoR");
+ const map = {};
+ (s.tempData||[]).forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].t = d.y; });
+ (s.gasData||[]).forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].g = d.y; });
+ (s.airData||[]).forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].a = d.y; });
+ (s.rorData||[]).forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].r = d.y; });
+ Object.keys(map).map(Number).sort((a,b)=>a-b).forEach(k=>{
+  const row = map[k];
+  csv.push(`${secToMinSec(k)},${row.t??""},${row.g??""},${row.a??""},${row.r??""}`);
+ });
+ const blob = new Blob([csv.join("\n")], {type:"text/csv;charset=utf-8;"});
+ const url = URL.createObjectURL(blob);
+ const a = document.createElement("a");
+ a.href = url;
+ const safe = s.title ? s.title.replace(/[\\/:*?"<>| ]+/g,"_") : `roast_${Date.now()}`;
+ a.download = `${safe}.csv`;
+ document.body.appendChild(a); a.click(); document.body.removeChild(a);
+ URL.revokeObjectURL(url);
+}
+
+/* Delete selected snapshot(s) — チェックボックス方式 */
+document.getElementById("deleteHistoryBtn").onclick = () => {
+  const checks = Array.from(document.querySelectorAll(".history-chk")).filter(c=>c.checked);
+  if(checks.length === 0) {
+    const idx = document.getElementById("historySelect").value;
+    if(idx === "") return alert("削除する履歴を選んでください");
+    if(!confirm("選択された履歴を削除しますか？")) return;
+    const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+    h.splice(idx,1);
+    localStorage.setItem("roastHistory", JSON.stringify(h));
+    updateHistory();
+    document.getElementById("historySelect").value = "";
+    document.getElementById("historyName").value = "";
+    return;
+  }
+  if(!confirm(`${checks.length} 件の履歴を削除します。よろしいですか？`)) return;
+  const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+  const idxs = checks.map(c=>parseInt(c.getAttribute("data-idx"),10)).filter(n=>!isNaN(n)).sort((a,b)=>b-a);
+  idxs.forEach(i=>{
+    if(i>=0 && i < h.length) h.splice(i,1);
+  });
+  localStorage.setItem("roastHistory", JSON.stringify(h));
+  updateHistory();
+  document.getElementById("historySelect").value = "";
+  document.getElementById("historyName").value = "";
+  alert(`${idxs.length} 件の履歴を削除しました`);
+};
+
+/* Select All / Clear All buttons for checkboxes */
+document.getElementById("selectAllHistoryBtn").onclick = () => {
+  document.querySelectorAll(".history-chk").forEach(c=>c.checked = true);
+};
+document.getElementById("clearAllHistoryBtn").onclick = () => {
+  document.querySelectorAll(".history-chk").forEach(c=>c.checked = false);
+};
+
+/* Rename selected snapshot (select-based) */
+document.getElementById("renameHistoryBtn").onclick = () => {
+ const idx = document.getElementById("historySelect").value;
+ if(idx === "") return alert("編集する履歴を選んでください");
+ const newName = document.getElementById("historyName").value.trim();
+ const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+ if(!h[idx]) return alert("履歴が見つかりません");
+ h[idx].title = newName;
+ localStorage.setItem("roastHistory", JSON.stringify(h));
+ updateHistory();
+ document.getElementById("historySelect").value = idx;
+};
+
+/* Compare select handler */
+document.getElementById("compareSelect").onchange = () => {
+ const idx = document.getElementById("compareSelect").value;
+ const compDataset = chart.data.datasets[4];
+ if(idx === ""){
+   compDataset.data = [];
+   compDataset.hidden = true;
+   chart.update();
+   return;
+ }
+ const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+ const r = h[idx];
+ if(!r) { alert("選択された履歴が見つかりません"); return; }
+ compDataset.data = (r.tempData||[]).map(d => ({x: d.x, y: d.y}));
+ compDataset.hidden = false;
+ chart.update();
+};
+
+document.getElementById("clearCompareBtn").onclick = () => {
+ chart.data.datasets[4].data = [];
+ chart.data.datasets[4].hidden = true;
+ document.getElementById("compareSelect").value = "";
+ chart.update();
+};
+
+/* CSV Export (current data) */
+document.getElementById("csvBtn").onclick = () => {
+ let csv = [];
+ csv.push("# Roast Logger CSV");
+ csv.push("# SavedAt," + new Date().toISOString());
+ // meta
+ csv.push(`# Date,${document.getElementById("metaDate").value || ""}`);
+ csv.push(`# Country,${document.getElementById("metaCountry").value || ""}`);
+ csv.push(`# Farm,${document.getElementById("metaFarm").value || ""}`);
+ csv.push(`# Variety,${document.getElementById("metaVariety").value || ""}`);
+ csv.push(`# Process,${document.getElementById("metaProcess").value || ""}`);
+ csv.push(`# Altitude,${document.getElementById("metaAltitude").value || ""}`);
+ if(tpTime!=null) csv.push(`# TP,${secToMinSec(tpTime)}`);
+ if(dryTime!=null) csv.push(`# DryEnd,${secToMinSec(dryTime)}`);
+ if(fcTime!=null) csv.push(`# FirstCrack,${secToMinSec(fcTime)}`);
+ if(dropTime!=null) csv.push(`# Drop,${secToMinSec(dropTime)}`);
+ const ratio = calcPhaseRatio();
+ if(ratio){
+  csv.push(`# DryingTime,${ratio.dryingTime}`);
+  csv.push(`# MaillardTime,${ratio.maillardTime}`);
+  csv.push(`# DevTime,${ratio.devTime}`);
+  csv.push(`# DryingRate,${ratio.dryingPct}%`);
+  csv.push(`# MaillardRate,${ratio.maillardPct}%`);
+  csv.push(`# DevRate,${ratio.devPct}%`);
+ }
+ csv.push("# Events");
+ csv.push("Event,Time,Temp,Gas,Air");
+ eventLog.forEach(ev=>{
+  csv.push(`${ev.name},${secToMinSec(ev.t)},${ev.temp},${ev.gas},${ev.air}`);
+ });
+ csv.push("# MinuteLog");
+ csv.push("Time,Temp,Gas,Air,RoR");
+ minuteLog.forEach(m=>{
+  csv.push(`${m.time},${m.temp},${m.gas},${m.air},${m.ror}`);
+ });
+ csv.push("# TimeSeries");
+ csv.push("Time,Temp,Gas,Air,RoR");
+ const map = {};
+ tempData.forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].t = d.y; });
+ gasData.forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].g = d.y; });
+ airData.forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].a = d.y; });
+ rorData.forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].r = d.y; });
+ Object.keys(map).map(Number).sort((a,b)=>a-b).forEach(k=>{
+  const row = map[k];
+  csv.push(`${secToMinSec(k)},${row.t ?? ""},${row.g ?? ""},${row.a ?? ""},${row.r ?? ""}`);
+ });
+ const blob = new Blob([csv.join("\n")], {type:"text/csv;charset=utf-8;"});
+ const url = URL.createObjectURL(blob);
+ const a = document.createElement("a");
+ a.href = url;
+ a.download = `roast_${Date.now()}.csv`;
+ document.body.appendChild(a);
+ a.click();
+ document.body.removeChild(a);
+ URL.revokeObjectURL(url);
+};
+
+/* CSV Import: loadCsv input handler (existing) with createEventRow use */
+document.getElementById("loadCsv").onchange = e => {
+ const file = e.target.files[0];
+ if(!file) return;
+ const reader = new FileReader();
+ reader.onload = ev => {
+   const text = ev.target.result;
+   // reset
+   tempData.length = gasData.length = airData.length = rorData.length = 0;
+   minuteLog.length = eventLog.length = 0;
+   document.querySelector("#logTable tbody").innerHTML = "";
+   document.querySelector("#eventTable tbody").innerHTML = "";
+   let lines = text.split(/\r?\n/);
+   let mode = "";
+   lines.forEach(raw=>{
+     const line = raw.trim();
+     if(!line) return;
+     if(line.startsWith("#")){
+       if(line.startsWith("# Date,")) { document.getElementById("metaDate").value = line.split(",")[1] || ""; return; }
+       if(line.startsWith("# Country,")) { document.getElementById("metaCountry").value = line.split(",")[1] || ""; return; }
+       if(line.startsWith("# Farm,")) { document.getElementById("metaFarm").value = line.split(",")[1] || ""; return; }
+       if(line.startsWith("# Variety,")) { document.getElementById("metaVariety").value = line.split(",")[1] || ""; return; }
+       if(line.startsWith("# Process,")) { document.getElementById("metaProcess").value = line.split(",")[1] || ""; return; }
+       if(line.startsWith("# Altitude,")) { document.getElementById("metaAltitude").value = line.split(",")[1] || ""; return; }
+       if(line.startsWith("# Events")) { mode = "events"; return; }
+       if(line.startsWith("# MinuteLog")) { mode = "minutelog"; return; }
+       if(line.startsWith("# TimeSeries")) { mode = "timeseries"; return; }
+       if(line.startsWith("# TP,")) { tpTime = minSecToSec(line.split(",")[1]); return; }
+       if(line.startsWith("# DryEnd,")) { dryTime = minSecToSec(line.split(",")[1]); return; }
+       if(line.startsWith("# FirstCrack,")) { fcTime = minSecToSec(line.split(",")[1]); return; }
+       if(line.startsWith("# Drop,")) { dropTime = minSecToSec(line.split(",")[1]); return; }
+       return;
+     }
+     if(line.match(/^(Time|Event),/i)) return;
+     const parts = line.split(",");
+     if(mode === "events"){
+       const [name, timeStr, tStr, gStr, aStr] = parts;
+       const tSec = minSecToSec(timeStr);
+       if(isFinite(tSec)){
+         const ev = { name, t: tSec, temp: tStr? Number(tStr):"", gas: gStr? Number(gStr):"", air: aStr? Number(aStr):"" };
+         eventLog.push(ev);
+         const idxNow = eventLog.length-1;
+         createEventRow(ev, idxNow);
+       }
+       return;
+     }
+     if(mode === "minutelog"){
+       const [timeStr, tStr, gStr, aStr, rStr] = parts;
+       const sec = minSecToSec(timeStr);
+       if(isFinite(sec)){
+         const rec = { min: Math.floor(sec/60), time: timeStr, temp: tStr||"", gas: gStr||"", air: aStr||"", ror: rStr||"" };
+         minuteLog.push(rec);
+         const tr = document.createElement("tr");
+         tr.innerHTML = `<td>${rec.time}</td><td>${rec.temp}</td><td>${rec.gas}</td><td>${rec.air}</td><td>${rec.ror}</td>`;
+         document.querySelector("#logTable tbody").appendChild(tr);
+       }
+       return;
+     }
+     // timeseries
+     const [timeStr, tStr, gStr, aStr, rStr] = parts;
+     const sec = minSecToSec(timeStr);
+     if(!isFinite(sec)) return;
+     if(tStr) tempData.push({x:sec, y: Number(tStr)});
+     if(gStr) gasData.push({x:sec, y: Number(gStr)});
+     if(aStr) airData.push({x:sec, y: Number(aStr)});
+     if(rStr) rorData.push({x:sec, y: Number(rStr)});
+   });
+
+   startTime = Date.now();
+   if(!dropTime){
+     endTime = Math.max(0, ...(tempData.map(d=>d.x).concat(gasData.map(d=>d.x), airData.map(d=>d.x))));
+     if(!isFinite(endTime)) endTime = null;
+   } else {
+     endTime = dropTime;
+     enableEventTempEditing();
+   }
+   lastMinuteLogged = minuteLog.length? minuteLog[minuteLog.length-1].min : -1;
+   draw();
+ };
+ reader.readAsText(file);
+};
+
+/* ========== ここから DB 検索 / 統計機能 ========== */
+
+function computePhasesForSnapshot(s){
+  const tp = s.tpTime, dry = s.dryTime, fc = s.fcTime, drop = s.dropTime;
+  if(tp==null || dry==null || fc==null || drop==null) return null;
+  const drying = dry - tp;
+  const maillard = fc - dry;
+  const dev = drop - fc;
+  const total = drop - tp;
+  if(total <= 0) return null;
+  return {
+    drying, maillard, dev,
+    dryingPct: drying/total*100,
+    maillardPct: maillard/total*100,
+    devPct: dev/total*100
+  };
+}
+
+function searchRoastHistory(){
+  const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+  const fCountry = (document.getElementById("filterCountry").value || "").trim().toLowerCase();
+  const fFarm = (document.getElementById("filterFarm").value || "").trim().toLowerCase();
+  const fVar = (document.getElementById("filterVariety").value || "").trim().toLowerCase();
+  const fProc = (document.getElementById("filterProcess").value || "").trim().toLowerCase();
+  const altMin = parseFloat(document.getElementById("filterAltMin").value);
+  const altMax = parseFloat(document.getElementById("filterAltMax").value);
+  const dateFrom = document.getElementById("filterDateFrom").value;
+  const dateTo = document.getElementById("filterDateTo").value;
+
+  const results = h.map((s, idx) => ({s, idx})).filter(item => {
+    const s = item.s;
+    const meta = s.meta || {};
+    if(fCountry && !(meta.country||"").toLowerCase().includes(fCountry)) return false;
+    if(fFarm && !(meta.farm||"").toLowerCase().includes(fFarm)) return false;
+    if(fVar && !(meta.variety||"").toLowerCase().includes(fVar)) return false;
+    if(fProc && !(meta.process||"").toLowerCase().includes(fProc)) return false;
+    if(!isNaN(altMin) && altMin !== null){
+      const a = parseFloat(meta.altitude);
+      if(isNaN(a) || a < altMin) return false;
+    }
+    if(!isNaN(altMax) && altMax !== null){
+      const a = parseFloat(meta.altitude);
+      if(isNaN(a) || a > altMax) return false;
+    }
+    if(dateFrom){
+      const d = meta.date || "";
+      if(!d || d < dateFrom) return false;
+    }
+    if(dateTo){
+      const d = meta.date || "";
+      if(!d || d > dateTo) return false;
+    }
+    return true;
+  });
+
+  renderSearchResults(results);
+}
+
+function renderSearchResults(results){
+  const container = document.getElementById("dbResults");
+  const tbody = document.querySelector("#dbTable tbody");
+  tbody.innerHTML = "";
+  if(!results.length){
+    container.style.display = "none";
+    document.getElementById("dbStats").style.display = "none";
+    document.getElementById("dbStats").innerHTML = "";
+    return;
+  }
+  container.style.display = "block";
+  let sumDev=0, countDev=0, sumDry=0, sumMail=0;
+  results.forEach((item,i)=>{
+    const s = item.s;
+    const idx = item.idx;
+    const meta = s.meta || {};
+    const phases = computePhasesForSnapshot(s);
+    let devText = phases ? (phases.devPct.toFixed(1)+"%") : "-";
+    if(phases){ sumDev += phases.devPct; sumDry += phases.dryingPct; sumMail += phases.maillardPct; countDev++; }
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${i+1}</td>
+      <td>${meta.date||""}</td>
+      <td>${meta.country||""}</td>
+      <td>${meta.farm||""}</td>
+      <td>${meta.variety||""}</td>
+      <td>${meta.process||""}</td>
+      <td>${meta.altitude||""}</td>
+      <td>${devText}</td>
+      <td>
+        <button data-idx="${idx}" class="db-load">Load</button>
+        <button data-idx="${idx}" class="db-compare">Compare</button>
+        <button data-idx="${idx}" class="db-export">Export</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+
+  // stats
+  const statsNode = document.getElementById("dbStats");
+  const avgDev = countDev ? (sumDev/countDev).toFixed(1) : "-";
+  const avgDry = countDev ? (sumDry/countDev).toFixed(1) : "-";
+  const avgMail = countDev ? (sumMail/countDev).toFixed(1) : "-";
+  statsNode.style.display = "block";
+  statsNode.innerHTML = `<strong>Results:</strong> ${results.length} &nbsp; <strong>Avg Dev%</strong>: ${avgDev}% &nbsp; <strong>Avg Dry%</strong>: ${avgDry}% &nbsp; <strong>Avg Maillard%</strong>: ${avgMail}%`;
+
+  // attach handlers
+  Array.from(document.querySelectorAll(".db-load")).forEach(b=>{
+    b.onclick = e => {
+      const idx = e.currentTarget.getAttribute("data-idx");
+      document.getElementById("historySelect").value = idx;
+      document.getElementById("historySelect").dispatchEvent(new Event('change'));
+    };
+  });
+  Array.from(document.querySelectorAll(".db-compare")).forEach(b=>{
+    b.onclick = e => {
+      const idx = e.currentTarget.getAttribute("data-idx");
+      const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+      const s = h[idx];
+      if(!s) return alert("履歴が見つかりません");
+      chart.data.datasets[4].data = (s.tempData||[]).map(d=>({x:d.x,y:d.y}));
+      chart.data.datasets[4].hidden = false;
+      document.getElementById("compareSelect").value = idx;
+      chart.update();
+    };
+  });
+  Array.from(document.querySelectorAll(".db-export")).forEach(b=>{
+    b.onclick = e => {
+      const idx = e.currentTarget.getAttribute("data-idx");
+      const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+      const s = h[idx];
+      if(!s) return alert("履歴が見つかりません");
+      exportSnapshot(s);
+    };
+  });
+}
+
+/* clear filters */
+document.getElementById("clearFilterBtn").onclick = () => {
+  ["filterCountry","filterFarm","filterVariety","filterProcess","filterAltMin","filterAltMax","filterDateFrom","filterDateTo"].forEach(id=>{
+    document.getElementById(id).value = "";
+  });
+  document.getElementById("dbResults").style.display = "none";
+  document.getElementById("dbStats").style.display = "none";
+};
+
+/* wire search button */
+document.getElementById("searchDbBtn").onclick = () => {
+  searchRoastHistory();
+};
+
+/* Toggle collapsible panels */
+document.getElementById("toggleDbBtn").onclick = () => {
+  const panel = document.getElementById("dbSearchPanel");
+  const btn = document.getElementById("toggleDbBtn");
+  const isOpen = btn.getAttribute("aria-expanded") === "true";
+  btn.setAttribute("aria-expanded", (!isOpen).toString());
+  btn.textContent = isOpen ? "展開" : "折りたたむ";
+  panel.style.display = isOpen ? "none" : "block";
+};
+document.getElementById("toggleGreenBtn").onclick = () => {
+  const panel = document.getElementById("greenBeanPanel");
+  const btn = document.getElementById("toggleGreenBtn");
+  const isOpen = btn.getAttribute("aria-expanded") === "true";
+  btn.setAttribute("aria-expanded", (!isOpen).toString());
+  btn.textContent = isOpen ? "展開" : "折りたたむ";
+  panel.style.display = isOpen ? "none" : "block";
+};
 
 /* Initialize history dropdown & checkbox list on load */
 updateHistory();
@@ -712,4 +1215,4 @@ window._roast_search = { searchRoastHistory, renderSearchResults, computePhasesF
 
 </script>
 </body>
-</html> 
+</html>
