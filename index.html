@@ -27,6 +27,7 @@ button,input,select,textarea{width:100%;padding:12px;margin:6px 0;font-size:16px
 .row>*{flex:1}
 #dropBtn{background:#d32f2f;color:#fff;font-weight:bold}
 #csvBtn{background:#1976d2;color:#fff}
+#editSeriesBtn{background:#4caf50;color:#fff}
 #time{text-align:center;font-size:22px;margin:6px 0}
 #phaseText{text-align:center;font-size:16px;font-weight:bold}
 button{touch-action:manipulation}
@@ -89,6 +90,9 @@ body.ipad #chartWrap{height:48vh}
 #dbResults{max-height:240px;overflow:auto;margin-top:6px;border:1px solid #ddd;background:#fff}
 #dbResults table{font-size:12px}
 #dbStats{background:#fff;padding:8px;border:1px solid #eee;margin-top:6px}
+
+/* edit mode hint */
+#editHint{font-size:13px;color:#2e7d32;margin:6px 0;display:none}
 </style>
 </head>
 
@@ -112,6 +116,7 @@ body.ipad #chartWrap{height:48vh}
         <thead><tr><th>Event</th><th>Time</th><th>Temp</th><th>Gas</th><th>Air</th></tr></thead>
         <tbody></tbody>
       </table>
+      <div class="small-muted">※ Temp 列は焙煎完了（Drop）後に編集可能になります</div>
     </div>
   </div>
 
@@ -158,9 +163,12 @@ body.ipad #chartWrap{height:48vh}
       <button id="dropBtn">DROP</button>
 
       <button id="csvBtn">CSV Export</button>
+      <button id="editSeriesBtn">編集モードを開始</button>
+      <div id="editHint">編集モード：チャート上の点をクリックして時間（mm:ss）や値を編集、または "d" を入力すると削除できます。</div>
+
       <input id="loadCsv" type="file" accept=".csv">
 
-      <!-- 履歴セレクト + 履歴操作 -->
+      <!-- 履歴セレクト + 履歴操作（元の互換性を残す） -->
       <div class="history-controls">
         <select id="historySelect"><option value="">履歴</option></select>
         <button id="exportHistoryBtn">Export Selected</button>
@@ -171,46 +179,67 @@ body.ipad #chartWrap{height:48vh}
         <button id="deleteHistoryBtn">Delete Selected</button>
       </div>
 
+      <!-- check controls: select all / clear -->
+      <div id="historyControlsRow">
+        <button id="selectAllHistoryBtn">全選択</button>
+        <button id="clearAllHistoryBtn">選択解除</button>
+      </div>
+
+      <!-- チェックボックス方式の履歴リスト（B方式） -->
+      <div id="historyListWrap" aria-label="履歴リスト（複数選択可）">
+        <div id="historyList"><!-- JS で埋める --></div>
+      </div>
+
       <!-- 比較セレクト -->
       <div class="history-controls">
         <select id="compareSelect"><option value="">比較（Compare）</option></select>
         <button id="clearCompareBtn">Clear Compare</button>
       </div>
 
-      <!-- ===== DB Search UI (追加) ===== -->
-      <h3>DB Search</h3>
-      <label>Country</label><input id="filterCountry" placeholder="例：Ethiopia">
-      <label>Farm</label><input id="filterFarm" placeholder="例：Yirgacheffe">
-      <label>Variety</label><input id="filterVariety" placeholder="例：Heirloom">
-      <label>Process</label><input id="filterProcess" placeholder="Washed / Natural">
-      <div class="row">
-        <input id="filterAltMin" type="number" placeholder="alt min (m)">
-        <input id="filterAltMax" type="number" placeholder="alt max (m)">
+      <!-- ===== DB Search UI (追加) - collapsible ===== -->
+      <div class="panel-toggle">
+        <h3 style="margin:0">DB Search</h3>
+        <button id="toggleDbBtn" aria-expanded="true">折りたたむ</button>
       </div>
-      <div class="row">
-        <input id="filterDateFrom" type="date" placeholder="from">
-        <input id="filterDateTo" type="date" placeholder="to">
-      </div>
-      <div class="row">
-        <button id="searchDbBtn">Search DB</button>
-        <button id="clearFilterBtn">Clear</button>
+      <div id="dbSearchPanel" class="collapsible">
+        <label>Country</label><input id="filterCountry" placeholder="例：Ethiopia">
+        <label>Farm</label><input id="filterFarm" placeholder="例：Yirgacheffe">
+        <label>Variety</label><input id="filterVariety" placeholder="例：Heirloom">
+        <label>Process</label><input id="filterProcess" placeholder="Washed / Natural">
+        <div class="row">
+          <input id="filterAltMin" type="number" placeholder="alt min (m)">
+          <input id="filterAltMax" type="number" placeholder="alt max (m)">
+        </div>
+        <div class="row">
+          <input id="filterDateFrom" type="date" placeholder="from">
+          <input id="filterDateTo" type="date" placeholder="to">
+        </div>
+        <div class="row">
+          <button id="searchDbBtn">Search DB</button>
+          <button id="clearFilterBtn">Clear</button>
+        </div>
+        <div id="dbStats" aria-live="polite" style="display:none"></div>
+        <div id="dbResults" style="display:none">
+          <table id="dbTable">
+            <thead><tr><th>#</th><th>Date</th><th>Country</th><th>Farm</th><th>Variety</th><th>Process</th><th>Alt</th><th>Dev%</th><th>Actions</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </div>
 
-      <div id="dbStats" aria-live="polite" style="display:none"></div>
-      <div id="dbResults" style="display:none">
-        <table id="dbTable">
-          <thead><tr><th>#</th><th>Date</th><th>Country</th><th>Farm</th><th>Variety</th><th>Process</th><th>Alt</th><th>Dev%</th><th>Actions</th></tr></thead>
-          <tbody></tbody>
-        </table>
+      <!-- Green Bean Info - collapsible -->
+      <div class="panel-toggle" style="margin-top:8px">
+        <h3 style="margin:0">Green Bean Info</h3>
+        <button id="toggleGreenBtn" aria-expanded="true">折りたたむ</button>
       </div>
-
-      <h3>Green Bean Info</h3>
-      <label>日付</label><input id="metaDate" type="date">
-      <label>国</label><input id="metaCountry">
-      <label>農園</label><input id="metaFarm">
-      <label>品種</label><input id="metaVariety">
-      <label>プロセス</label><input id="metaProcess">
-      <label>標高</label><input id="metaAltitude" type="number" inputmode="numeric" pattern="[0-9]*">
+      <div id="greenBeanPanel" class="collapsible">
+        <label>日付</label><input id="metaDate" type="date">
+        <label>国</label><input id="metaCountry">
+        <label>農園</label><input id="metaFarm">
+        <label>品種</label><input id="metaVariety">
+        <label>プロセス</label><input id="metaProcess">
+        <label>標高</label><input id="metaAltitude" type="number" inputmode="numeric" pattern="[0-9]*">
+      </div>
 
       <div id="bottomSpacer"></div>
     </div>
@@ -251,7 +280,12 @@ const eventLog = [];
 let lastMinuteLogged = -1;
 const nowSec = ()=> endTime ?? Math.floor((Date.now()-startTime)/1000);
 
+/* --- Editing mode state --- */
+let editMode = false;
+
 /* Chart plugin & chart (元コード維持) */
+/* -- NOTE: datasets now include `tension` for curved lines. Also default pointRadius kept 0 for tidy look.
+         When editMode = true we will temporarily show points (pointRadius) to make clicking easier. */
 const phaseOverlayPlugin = {
   id: 'phaseOverlay',
   afterDraw(chart){
@@ -313,11 +347,11 @@ const chart = new Chart(document.getElementById("chart"),{
   plugins:[phaseOverlayPlugin],
   type:"line",
   data:{datasets:[
-    {label:"Temp",data:[],borderColor:"red",borderWidth:2,pointRadius:0},
-    {label:"RoR",data:[],yAxisID:"yRoR",borderColor:"blue",borderWidth:2,pointRadius:0},
-    {label:"Gas",data:[],yAxisID:"yGas",borderColor:"green",borderDash:[4,4],pointRadius:0},
-    {label:"Air",data:[],yAxisID:"yAir",borderColor:"cyan",borderDash:[2,2],pointRadius:0},
-    {label:"Compare",data:[],borderColor:"#666",borderDash:[6,4],borderWidth:2,pointRadius:0,hidden:true}
+    {label:"Temp",data:[],borderColor:"red",borderWidth:2,pointRadius:0,tension:0.35},
+    {label:"RoR",data:[],yAxisID:"yRoR",borderColor:"blue",borderWidth:2,pointRadius:0,tension:0.35},
+    {label:"Gas",data:[],yAxisID:"yGas",borderColor:"green",borderDash:[4,4],pointRadius:0,tension:0.35},
+    {label:"Air",data:[],yAxisID:"yAir",borderColor:"cyan",borderDash:[2,2],pointRadius:0,tension:0.35},
+    {label:"Compare",data:[],borderColor:"#666",borderDash:[6,4],borderWidth:2,pointRadius:0,hidden:true,tension:0.35}
   ]},
   options:{
     animation:false,
@@ -342,6 +376,72 @@ function calcRoR(){
  }
 }
 
+/* rebuild minuteLog & table from current series arrays */
+function rebuildMinuteLogFromSeries(){
+  minuteLog.length = 0;
+  const tbody = document.querySelector("#logTable tbody");
+  tbody.innerHTML = "";
+  // find max second
+  const maxX = Math.max(
+    0,
+    ...(tempData.map(d=>d.x)),
+    ...(gasData.map(d=>d.x)),
+    ...(airData.map(d=>d.x))
+  );
+  const lastMin = Math.floor(maxX/60);
+  for(let m=0;m<=lastMin;m++){
+    const sec = m*60;
+    const tRec = [...tempData].reverse().find(d=>d.x<=sec);
+    const gRec = [...gasData].reverse().find(d=>d.x<=sec);
+    const aRec = [...airData].reverse().find(d=>d.x<=sec);
+    const rRec = [...rorData].reverse().find(d=>d.x<=sec);
+    const rec = {
+      min: m,
+      time: secToMinSec(sec),
+      temp: tRec? (Math.round(tRec.y)) : "",
+      gas: gRec? gRec.y.toFixed(1) : "",
+      air: aRec? aRec.y.toFixed(1) : "",
+      ror: rRec? rRec.y.toFixed(1) : ""
+    };
+    minuteLog.push(JSON.parse(JSON.stringify(rec)));
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${rec.time}</td><td>${rec.temp}</td><td>${rec.gas}</td><td>${rec.air}</td><td>${rec.ror}</td>`;
+    tbody.appendChild(tr);
+  }
+  lastMinuteLogged = minuteLog.length? minuteLog[minuteLog.length-1].min : -1;
+}
+
+/* helper: create event table row for given event object and index */
+function createEventRow(ev, idx){
+  const tbody = document.querySelector("#eventTable tbody");
+  const tr = document.createElement("tr");
+  tr.dataset.idx = idx;
+  // temp cell editable only if dropTime already set
+  const editable = (dropTime != null);
+  const tempVal = (ev.temp!=="" && ev.temp!==undefined) ? ev.temp : "";
+  tr.innerHTML = `<td>${ev.name}</td>
+    <td>${secToMinSec(ev.t)}</td>
+    <td class="temp-cell" contenteditable="${editable ? "true" : "false"}">${tempVal}</td>
+    <td>${ev.gas!==""?ev.gas:""}</td>
+    <td>${ev.air!==""?ev.air:""}</td>`;
+  tbody.appendChild(tr);
+
+  // when editable, update eventLog on blur
+  const tempTd = tr.querySelector(".temp-cell");
+  tempTd.addEventListener("blur", ()=>{
+    const text = tempTd.textContent.trim();
+    const n = parseFloat(text);
+    if(!isNaN(n)){
+      eventLog[idx].temp = n;
+      tempTd.textContent = n;
+    } else {
+      // if non-numeric, keep as-is string or empty
+      eventLog[idx].temp = text === "" ? "" : text;
+    }
+  });
+}
+
+/* Event log */
 function addEventLog(name){
  const t = nowSec();
  const tempRec = [...tempData].reverse().find(d=>d.x<=t);
@@ -354,13 +454,21 @@ function addEventLog(name){
   gas: gasRec ? Number(gasRec.y) : (gas? Number(gas) : ""),
   air: airRec ? Number(airRec.y) : (air? Number(air) : "")
  };
+ // push then create row so index matches
  eventLog.push(JSON.parse(JSON.stringify(rec)));
- const tbody = document.querySelector("#eventTable tbody");
- const tr = document.createElement("tr");
- tr.innerHTML = `<td>${rec.name}</td><td>${secToMinSec(rec.t)}</td><td>${rec.temp!==""?rec.temp:""}</td><td>${rec.gas!==""?rec.gas:""}</td><td>${rec.air!==""?rec.air:""}</td>`;
- tbody.appendChild(tr);
+ const idx = eventLog.length - 1;
+ createEventRow(rec, idx);
 }
 
+/* When roast finished (drop), enable editing for all existing temp cells */
+function enableEventTempEditing(){
+  document.querySelectorAll("#eventTable .temp-cell").forEach(td=>{
+    td.contentEditable = "true";
+    td.classList.add("editable-enabled");
+  });
+}
+
+/* Minute log update kept, but we will rebuild via rebuildMinuteLogFromSeries when appropriate */
 function updateMinuteLogIfNeeded(){
  if(!startTime) return;
  const s = nowSec();
@@ -509,15 +617,19 @@ fcBtn.onpointerdown = e => { e.preventDefault(); holdStart(()=>{ fcTime = nowSec
 
 document.getElementById("tpBtn").onclick = () => { tpTime = nowSec(); addEventLog("Turning Point"); draw(); };
 
+/* When Drop pressed: set dropTime, enable editing for temp cells, stop timer, save */
 document.getElementById("dropBtn").onclick = () => {
  dropTime = nowSec(); endTime = dropTime;
  addEventLog("Drop");
  clearInterval(timer);
+ // enable manual temp editing after roast finished
+ enableEventTempEditing();
  draw();
  saveHistory(); // 保存
 };
 
 /* ====== 履歴/CSV/比較の既存機能（保持） ====== */
+/* saveHistory, updateHistory, historySelect onchange, exportSnapshot, delete, rename, compareSelect, csv export, import... */
 
 /* saveHistory: 履歴を localStorage に保存 */
 function saveHistory(){
@@ -546,21 +658,82 @@ function saveHistory(){
  updateHistory();
 }
 
-/* updateHistory: セレクトを再構築 */
+/* updateHistory: rebuild select and checkbox list */
 function updateHistory(){
  const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
  const sel = document.getElementById("historySelect");
  const cmp = document.getElementById("compareSelect");
+ const listWrap = document.getElementById("historyList");
  sel.innerHTML = '<option value="">履歴</option>';
  cmp.innerHTML = '<option value="">比較（Compare）</option>';
+ listWrap && (listWrap.innerHTML = '');
+ if(!h.length){
+   if(listWrap){
+     const ph = document.createElement("div");
+     ph.style.color = "#777";
+     ph.style.fontSize = "13px";
+     ph.style.padding = "8px";
+     ph.textContent = "保存された履歴はありません";
+     listWrap.appendChild(ph);
+   }
+   return;
+ }
  h.forEach((r,i)=>{
   const label = r.title ? `Roast ${i+1} - ${r.title}` : `Roast ${i+1} (${new Date(r.savedAt).toLocaleString()})`;
+
+  // update selects
   const o = document.createElement("option"); o.value = i; o.textContent = label; sel.appendChild(o);
   const o2 = document.createElement("option"); o2.value = i; o2.textContent = label; cmp.appendChild(o2);
+
+  // build checkbox list item if historyList exists
+  if(listWrap){
+    const row = document.createElement("div");
+    row.className = "history-item";
+    row.innerHTML = `
+      <input type="checkbox" class="history-chk" data-idx="${i}">
+      <div class="label">${label}</div>
+      <div class="history-actions">
+        <button class="history-load" data-idx="${i}" title="Load">Load</button>
+        <button class="history-compare" data-idx="${i}" title="Compare">Compare</button>
+        <button class="history-export" data-idx="${i}" title="Export">Export</button>
+      </div>
+    `;
+    listWrap.appendChild(row);
+  }
+ });
+
+ // attach handlers for the dynamic buttons (load/compare/export)
+ Array.from(document.querySelectorAll(".history-load")).forEach(b=>{
+   b.onclick = e => {
+     const idx = e.currentTarget.getAttribute("data-idx");
+     document.getElementById("historySelect").value = idx;
+     document.getElementById("historySelect").dispatchEvent(new Event('change'));
+   };
+ });
+ Array.from(document.querySelectorAll(".history-compare")).forEach(b=>{
+   b.onclick = e => {
+     const idx = e.currentTarget.getAttribute("data-idx");
+     const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+     const s = h[idx];
+     if(!s) return alert("履歴が見つかりません");
+     chart.data.datasets[4].data = (s.tempData||[]).map(d=>({x:d.x,y:d.y}));
+     chart.data.datasets[4].hidden = false;
+     document.getElementById("compareSelect").value = idx;
+     chart.update();
+   };
+ });
+ Array.from(document.querySelectorAll(".history-export")).forEach(b=>{
+   b.onclick = e => {
+     const idx = e.currentTarget.getAttribute("data-idx");
+     const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+     const s = h[idx];
+     if(!s) return alert("履歴が見つかりません");
+     exportSnapshot(s);
+   };
  });
 }
 
-/* historySelect onchange: 履歴を読み込む */
+/* historySelect onchange: load snapshot */
 document.getElementById("historySelect").onchange = () => {
  const idx = document.getElementById("historySelect").value;
  if(idx === "") return;
@@ -585,9 +758,8 @@ document.getElementById("historySelect").onchange = () => {
  });
  if(r.eventLog) r.eventLog.forEach(ev=>{
    eventLog.push(ev);
-   const tr = document.createElement("tr");
-   tr.innerHTML = `<td>${ev.name}</td><td>${secToMinSec(ev.t)}</td><td>${ev.temp}</td><td>${ev.gas}</td><td>${ev.air}</td>`;
-   document.querySelector("#eventTable tbody").appendChild(tr);
+   const idxNow = eventLog.length-1;
+   createEventRow(ev, idxNow);
  });
  // restore meta
  if(r.meta){
@@ -601,7 +773,11 @@ document.getElementById("historySelect").onchange = () => {
  document.getElementById("historyName").value = r.title || "";
  tpTime = r.tpTime; dryTime = r.dryTime; fcTime = r.fcTime; dropTime = r.dropTime;
  startTime = Date.now();
- if(dropTime) endTime = dropTime; else endTime = null;
+ if(dropTime) {
+   endTime = dropTime;
+   // allow editing after loading a finished roast
+   enableEventTempEditing();
+ } else endTime = null;
  lastMinuteLogged = minuteLog.length? minuteLog[minuteLog.length-1].min : -1;
  draw();
 };
@@ -664,20 +840,43 @@ function exportSnapshot(s){
  URL.revokeObjectURL(url);
 }
 
-/* Delete selected snapshot */
+/* Delete selected snapshot(s) — チェックボックス方式 */
 document.getElementById("deleteHistoryBtn").onclick = () => {
- const idx = document.getElementById("historySelect").value;
- if(idx === "") return alert("削除する履歴を選んでください");
- if(!confirm("選択された履歴を削除しますか？")) return;
- const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
- h.splice(idx,1);
- localStorage.setItem("roastHistory", JSON.stringify(h));
- updateHistory();
- document.getElementById("historySelect").value = "";
- document.getElementById("historyName").value = "";
+  const checks = Array.from(document.querySelectorAll(".history-chk")).filter(c=>c.checked);
+  if(checks.length === 0) {
+    const idx = document.getElementById("historySelect").value;
+    if(idx === "") return alert("削除する履歴を選んでください");
+    if(!confirm("選択された履歴を削除しますか？")) return;
+    const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+    h.splice(idx,1);
+    localStorage.setItem("roastHistory", JSON.stringify(h));
+    updateHistory();
+    document.getElementById("historySelect").value = "";
+    document.getElementById("historyName").value = "";
+    return;
+  }
+  if(!confirm(`${checks.length} 件の履歴を削除します。よろしいですか？`)) return;
+  const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
+  const idxs = checks.map(c=>parseInt(c.getAttribute("data-idx"),10)).filter(n=>!isNaN(n)).sort((a,b)=>b-a);
+  idxs.forEach(i=>{
+    if(i>=0 && i < h.length) h.splice(i,1);
+  });
+  localStorage.setItem("roastHistory", JSON.stringify(h));
+  updateHistory();
+  document.getElementById("historySelect").value = "";
+  document.getElementById("historyName").value = "";
+  alert(`${idxs.length} 件の履歴を削除しました`);
 };
 
-/* Rename selected snapshot */
+/* Select All / Clear All buttons for checkboxes */
+document.getElementById("selectAllHistoryBtn").onclick = () => {
+  document.querySelectorAll(".history-chk").forEach(c=>c.checked = true);
+};
+document.getElementById("clearAllHistoryBtn").onclick = () => {
+  document.querySelectorAll(".history-chk").forEach(c=>c.checked = false);
+};
+
+/* Rename selected snapshot (select-based) */
 document.getElementById("renameHistoryBtn").onclick = () => {
  const idx = document.getElementById("historySelect").value;
  if(idx === "") return alert("編集する履歴を選んでください");
@@ -690,10 +889,10 @@ document.getElementById("renameHistoryBtn").onclick = () => {
  document.getElementById("historySelect").value = idx;
 };
 
-/* Compare: overlay tempData from selected snapshot */
+/* Compare select handler */
 document.getElementById("compareSelect").onchange = () => {
  const idx = document.getElementById("compareSelect").value;
- const compDataset = chart.data.datasets[4]; // Compare dataset
+ const compDataset = chart.data.datasets[4];
  if(idx === ""){
    compDataset.data = [];
    compDataset.hidden = true;
@@ -755,7 +954,6 @@ document.getElementById("csvBtn").onclick = () => {
  const map = {};
  tempData.forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].t = d.y; });
  gasData.forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].g = d.y; });
- /* === 修正箇所: 下行の誤り map[x] -> map[d.x] に修正 === */
  airData.forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].a = d.y; });
  rorData.forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].r = d.y; });
  Object.keys(map).map(Number).sort((a,b)=>a-b).forEach(k=>{
@@ -773,7 +971,7 @@ document.getElementById("csvBtn").onclick = () => {
  URL.revokeObjectURL(url);
 };
 
-/* CSV Import: loadCsv input handler (existing) */
+/* CSV Import: loadCsv input handler (existing) with auto-save to roastHistory (keeps compatibility) */
 document.getElementById("loadCsv").onchange = e => {
  const file = e.target.files[0];
  if(!file) return;
@@ -844,20 +1042,18 @@ document.getElementById("loadCsv").onchange = e => {
      if(rStr) rorData.push({x:sec, y: Number(rStr)});
    });
 
-   // set times
    startTime = Date.now();
    if(!dropTime){
      endTime = Math.max(0, ...(tempData.map(d=>d.x).concat(gasData.map(d=>d.x), airData.map(d=>d.x))));
      if(!isFinite(endTime)) endTime = null;
    } else {
      endTime = dropTime;
+     enableEventTempEditing();
    }
    lastMinuteLogged = minuteLog.length? minuteLog[minuteLog.length-1].min : -1;
-
-   // draw the imported data into main view
    draw();
 
-   // --- 追加: 読み込んだデータを roastHistory に自動保存して比較欄に反映させる ---
+   // save imported as history so Compare can use it
    try{
      const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
      const snapshot = {
@@ -876,21 +1072,18 @@ document.getElementById("loadCsv").onchange = e => {
          process: importedMeta.process || "",
          altitude: importedMeta.altitude || ""
        },
-       // use filename (without extension) as title if available
        title: (file && file.name) ? file.name.replace(/\.[^/.]+$/, "") : (`import_${Date.now()}`),
        savedAt: new Date().toISOString()
      };
      h.push(snapshot);
      localStorage.setItem("roastHistory", JSON.stringify(h));
      updateHistory();
-     // 選択・即比較表示（比較欄に反映）
      const newIdx = h.length - 1;
      document.getElementById("compareSelect").value = newIdx;
      document.getElementById("compareSelect").dispatchEvent(new Event('change'));
    }catch(err){
      console.warn("Import -> save history failed:", err);
    }
-   // -------------------------------------------------------------------
 
  };
  reader.readAsText(file);
@@ -898,9 +1091,7 @@ document.getElementById("loadCsv").onchange = e => {
 
 /* ========== ここから DB 検索 / 統計機能 ========== */
 
-/* helper: compute dev% (and drying/maillard) for snapshot */
 function computePhasesForSnapshot(s){
-  // use tpTime/dryTime/fcTime/dropTime stored in snapshot
   const tp = s.tpTime, dry = s.dryTime, fc = s.fcTime, drop = s.dropTime;
   if(tp==null || dry==null || fc==null || drop==null) return null;
   const drying = dry - tp;
@@ -916,7 +1107,6 @@ function computePhasesForSnapshot(s){
   };
 }
 
-/* search DB with filters from UI */
 function searchRoastHistory(){
   const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
   const fCountry = (document.getElementById("filterCountry").value || "").trim().toLowerCase();
@@ -957,7 +1147,6 @@ function searchRoastHistory(){
   renderSearchResults(results);
 }
 
-/* render results table & stats */
 function renderSearchResults(results){
   const container = document.getElementById("dbResults");
   const tbody = document.querySelector("#dbTable tbody");
@@ -1002,7 +1191,7 @@ function renderSearchResults(results){
   statsNode.style.display = "block";
   statsNode.innerHTML = `<strong>Results:</strong> ${results.length} &nbsp; <strong>Avg Dev%</strong>: ${avgDev}% &nbsp; <strong>Avg Dry%</strong>: ${avgDry}% &nbsp; <strong>Avg Maillard%</strong>: ${avgMail}%`;
 
-  // attach handlers (delegation would be fine, but keep simple)
+  // attach handlers
   Array.from(document.querySelectorAll(".db-load")).forEach(b=>{
     b.onclick = e => {
       const idx = e.currentTarget.getAttribute("data-idx");
@@ -1047,11 +1236,188 @@ document.getElementById("searchDbBtn").onclick = () => {
   searchRoastHistory();
 };
 
-/* Initialize history dropdown on load */
+/* Toggle collapsible panels */
+document.getElementById("toggleDbBtn").onclick = () => {
+  const panel = document.getElementById("dbSearchPanel");
+  const btn = document.getElementById("toggleDbBtn");
+  const isOpen = btn.getAttribute("aria-expanded") === "true";
+  btn.setAttribute("aria-expanded", (!isOpen).toString());
+  btn.textContent = isOpen ? "展開" : "折りたたむ";
+  panel.style.display = isOpen ? "none" : "block";
+};
+document.getElementById("toggleGreenBtn").onclick = () => {
+  const panel = document.getElementById("greenBeanPanel");
+  const btn = document.getElementById("toggleGreenBtn");
+  const isOpen = btn.getAttribute("aria-expanded") === "true";
+  btn.setAttribute("aria-expanded", (!isOpen).toString());
+  btn.textContent = isOpen ? "展開" : "折りたたむ";
+  panel.style.display = isOpen ? "none" : "block";
+};
+
+/* Initialize history dropdown & checkbox list on load */
 updateHistory();
+
+/* If panels should start visible (they do) ensure display set */
+document.getElementById("dbSearchPanel").style.display = 'block';
+document.getElementById("greenBeanPanel").style.display = 'block';
 
 /* expose for debugging (optional) */
 window._roast_search = { searchRoastHistory, renderSearchResults, computePhasesForSnapshot };
+
+/* ===========================
+   === Editing mode logic ===
+   =========================== */
+
+/* Toggle edit mode (changes pointRadius so points are visible) */
+document.getElementById("editSeriesBtn").onclick = () => {
+  editMode = !editMode;
+  const btn = document.getElementById("editSeriesBtn");
+  const hint = document.getElementById("editHint");
+  if(editMode){
+    btn.textContent = "編集モード（ON）: クリックで編集";
+    hint.style.display = "block";
+    // expose points to be clickable
+    chart.data.datasets.forEach(ds=>{
+      ds.pointRadius = ds.label === "RoR" ? 0 : 5; // ログの編集対象は Temp/Gas/Air（RoRは読み取り専用）
+    });
+  } else {
+    btn.textContent = "編集モードを開始";
+    hint.style.display = "none";
+    chart.data.datasets.forEach(ds=> ds.pointRadius = 0);
+  }
+  chart.update();
+};
+
+/* Helper: sort series by x after modifications */
+function sortSeries(){
+  tempData.sort((a,b)=>a.x - b.x);
+  gasData.sort((a,b)=>a.x - b.x);
+  airData.sort((a,b)=>a.x - b.x);
+  rorData.sort((a,b)=>a.x - b.x);
+}
+
+/* Convert mm:ss string or seconds number -> seconds */
+function parseTimeInput(input, currentSec){
+  if(input === null) return null;
+  const v = (""+input).trim();
+  if(v === "") return null;
+  // allow direct seconds
+  if(/^\d+$/.test(v)) return parseInt(v,10);
+  // mm:ss
+  const parts = v.split(":").map(Number);
+  if(parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) return parts[0]*60 + parts[1];
+  // fallback: try parseFloat
+  const n = parseFloat(v);
+  if(!isNaN(n)) return Math.round(n);
+  return null;
+}
+
+/* Click handler on chart: find nearest editable point and prompt user */
+document.getElementById("chart").addEventListener("click", function(evt){
+  if(!editMode) return;
+  const rect = chart.canvas.getBoundingClientRect();
+  const xPixel = evt.clientX - rect.left;
+  const yPixel = evt.clientY - rect.top;
+  // datasets to consider: Temp (0), Gas (2), Air (3)
+  const candidates = [
+    {dsIndex:0, arr: tempData, yAxisId: chart.data.datasets[0].yAxisID || 'y', label: 'Temp'},
+    {dsIndex:2, arr: gasData,  yAxisId: chart.data.datasets[2].yAxisID || 'y', label: 'Gas'},
+    {dsIndex:3, arr: airData,  yAxisId: chart.data.datasets[3].yAxisID || 'y', label: 'Air'}
+  ];
+  let best = {dist: Infinity};
+  candidates.forEach(c=>{
+    const xScale = chart.scales.x;
+    const yScale = chart.scales[c.yAxisId] || chart.scales['y'];
+    c.arr.forEach((p, i) => {
+      const px = xScale.getPixelForValue(p.x);
+      const py = yScale.getPixelForValue(p.y);
+      const d = Math.hypot(px - xPixel, py - yPixel);
+      if(d < best.dist){
+        best = {dist: d, candidate: c, idx: i, px, py, point: p};
+      }
+    });
+  });
+  const THRESH = 20; // pixels tolerance
+  if(!best.candidate || best.dist > THRESH){
+    alert("近くに編集可能な点が見つかりません。点に近づけてもう一度クリックしてください。");
+    return;
+  }
+
+  const seriesLabel = best.candidate.label;
+  const p = best.point;
+  const currentTime = secToMinSec(p.x);
+  const currentVal = p.y;
+  // prompt user for new time and new value (user can press cancel to skip)
+  const newTimeInput = prompt(`${seriesLabel} 点の時間を入力してください（mm:ss）\n現在: ${currentTime}\n(空欄で時間を変更しません)`, currentTime);
+  if(newTimeInput === null) {
+    // user cancelled full edit -> allow editing value only
+    const newValOnly = prompt(`${seriesLabel} 点の値を入力してください\n現在: ${currentVal}\n(空欄で値を変更しません)`, String(currentVal));
+    if(newValOnly === null) return;
+    if(newValOnly.trim() !== ""){
+      const nv = parseFloat(newValOnly);
+      if(!isNaN(nv)){
+        best.candidate.arr[best.idx].y = nv;
+        // if editing Temp, recalc roR
+        sortSeries();
+        calcRoR();
+        rebuildMinuteLogFromSeries();
+        draw();
+      } else alert("数値入力ではありません");
+    }
+    return;
+  }
+
+  // user provided something (may be empty)
+  const parsedTime = parseTimeInput(newTimeInput, p.x);
+  const newValInput = prompt(`${seriesLabel} 点の値を入力してください\n現在: ${currentVal}\n(空欄で値を変更しません)`, String(currentVal));
+  if(newValInput === null) {
+    // user cancelled value prompt -> only time change (if provided)
+    if(parsedTime !== null){
+      best.candidate.arr[best.idx].x = parsedTime;
+      sortSeries();
+      calcRoR();
+      rebuildMinuteLogFromSeries();
+      draw();
+    }
+    return;
+  }
+
+  // if user typed 'd' or 'D' in value prompt, delete the point
+  if(newValInput.trim().toLowerCase() === 'd'){
+    best.candidate.arr.splice(best.idx, 1);
+    sortSeries();
+    calcRoR();
+    rebuildMinuteLogFromSeries();
+    draw();
+    return;
+  }
+
+  // otherwise apply updates
+  let applied = false;
+  if(parsedTime !== null){
+    best.candidate.arr[best.idx].x = parsedTime;
+    applied = true;
+  }
+  if(newValInput.trim() !== ""){
+    const nv = parseFloat(newValInput);
+    if(!isNaN(nv)){
+      best.candidate.arr[best.idx].y = nv;
+      applied = true;
+    } else {
+      alert("値が数値ではありません。変更は適用されませんでした。");
+    }
+  }
+  if(applied){
+    sortSeries();
+    calcRoR();
+    rebuildMinuteLogFromSeries();
+    draw();
+  }
+});
+
+/* ===========================
+   === End edit mode logic ===
+   =========================== */
 
 </script>
 </body>
