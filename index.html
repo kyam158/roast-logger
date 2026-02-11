@@ -518,7 +518,6 @@ document.getElementById("dropBtn").onclick = () => {
 };
 
 /* ====== 履歴/CSV/比較の既存機能（保持） ====== */
-/* saveHistory, updateHistory, historySelect onchange, exportSnapshot, delete, rename, compareSelect, csv export, import... */
 
 /* saveHistory: 履歴を localStorage に保存 */
 function saveHistory(){
@@ -756,7 +755,8 @@ document.getElementById("csvBtn").onclick = () => {
  const map = {};
  tempData.forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].t = d.y; });
  gasData.forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].g = d.y; });
- airData.forEach(d=>{ map[d.x] = map[x] || {}; map[d.x].a = d.y; });
+ /* === 修正箇所: 下行の誤り map[x] -> map[d.x] に修正 === */
+ airData.forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].a = d.y; });
  rorData.forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].r = d.y; });
  Object.keys(map).map(Number).sort((a,b)=>a-b).forEach(k=>{
   const row = map[k];
@@ -896,11 +896,11 @@ document.getElementById("loadCsv").onchange = e => {
  reader.readAsText(file);
 };
 
-/* ========== ここから DB 検索 / 統計機能 ==========
-   （既存の searchRoastHistory / renderSearchResults / computePhasesForSnapshot を利用） */
+/* ========== ここから DB 検索 / 統計機能 ========== */
 
 /* helper: compute dev% (and drying/maillard) for snapshot */
 function computePhasesForSnapshot(s){
+  // use tpTime/dryTime/fcTime/dropTime stored in snapshot
   const tp = s.tpTime, dry = s.dryTime, fc = s.fcTime, drop = s.dropTime;
   if(tp==null || dry==null || fc==null || drop==null) return null;
   const drying = dry - tp;
@@ -927,9 +927,6 @@ function searchRoastHistory(){
   const altMax = parseFloat(document.getElementById("filterAltMax").value);
   const dateFrom = document.getElementById("filterDateFrom").value;
   const dateTo = document.getElementById("filterDateTo").value;
-
-  // debug
-  console.log("DB Search:", {fCountry,fFarm,fVar,fProc,altMin,altMax,dateFrom,dateTo,historyCount: h.length});
 
   const results = h.map((s, idx) => ({s, idx})).filter(item => {
     const s = item.s;
@@ -1005,7 +1002,7 @@ function renderSearchResults(results){
   statsNode.style.display = "block";
   statsNode.innerHTML = `<strong>Results:</strong> ${results.length} &nbsp; <strong>Avg Dev%</strong>: ${avgDev}% &nbsp; <strong>Avg Dry%</strong>: ${avgDry}% &nbsp; <strong>Avg Maillard%</strong>: ${avgMail}%`;
 
-  // attach handlers
+  // attach handlers (delegation would be fine, but keep simple)
   Array.from(document.querySelectorAll(".db-load")).forEach(b=>{
     b.onclick = e => {
       const idx = e.currentTarget.getAttribute("data-idx");
