@@ -291,6 +291,7 @@ body.ipad #chartWrap{height:48vh}
 /* ===== pull-to-refresh 抑止（iPad/Safari 向け） =====
    - 内部スクロールは妨げない
    - ページ先頭での下方向スワイプ（引っ張り）だけ preventDefault する
+   - ただしボタンや input 等のインタラクティブ要素から始まるタッチは妨げない（CSV の保存などを保護）
 */
 (function(){
   if (!('ontouchstart' in window)) return;
@@ -312,6 +313,19 @@ body.ipad #chartWrap{height:48vh}
     return null;
   }
 
+  function isInteractiveOrActionable(el){
+    while(el){
+      if(el.nodeType !== 1){ el = el.parentElement; continue; }
+      const tn = el.tagName.toLowerCase();
+      if(['input','textarea','select','button','a','label'].includes(tn)) return true;
+      try{
+        if(el.getAttribute && (el.getAttribute('role') === 'button' || el.onclick)) return true;
+      } catch(e){}
+      el = el.parentElement;
+    }
+    return false;
+  }
+
   document.addEventListener("touchstart", function(e){
     startY = e.touches[0].clientY;
     targetEl = e.target;
@@ -324,6 +338,10 @@ body.ipad #chartWrap{height:48vh}
 
     // only consider downward pull
     if(dy <= 0) return;
+
+    // If touch started on an interactive element (button/input/link), don't block it —
+    // allow the normal click/interaction to proceed.
+    if(isInteractiveOrActionable(targetEl)) return;
 
     const scrollable = findScrollable(targetEl);
 
