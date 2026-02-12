@@ -27,7 +27,6 @@ button,input,select,textarea{width:100%;padding:12px;margin:6px 0;font-size:16px
 .row>*{flex:1}
 #dropBtn{background:#d32f2f;color:#fff;font-weight:bold}
 #csvBtn{background:#1976d2;color:#fff}
-#editSeriesBtn{background:#4caf50;color:#fff}
 #time{text-align:center;font-size:22px;margin:6px 0}
 #phaseText{text-align:center;font-size:16px;font-weight:bold}
 button{touch-action:manipulation}
@@ -91,8 +90,8 @@ body.ipad #chartWrap{height:48vh}
 #dbResults table{font-size:12px}
 #dbStats{background:#fff;padding:8px;border:1px solid #eee;margin-top:6px}
 
-/* edit mode hint */
-#editHint{font-size:13px;color:#2e7d32;margin:6px 0;display:none}
+/* make editable minute log cells visually distinct */
+#logTable td.editable { background:#fff9e6; border:1px dashed #f0c040; outline:none; }
 </style>
 </head>
 
@@ -163,9 +162,6 @@ body.ipad #chartWrap{height:48vh}
       <button id="dropBtn">DROP</button>
 
       <button id="csvBtn">CSV Export</button>
-      <button id="editSeriesBtn">編集モードを開始</button>
-      <div id="editHint">編集モード：チャート上の点をクリックして時間（mm:ss）や値を編集、または "d" を入力すると削除できます。</div>
-
       <input id="loadCsv" type="file" accept=".csv">
 
       <!-- 履歴セレクト + 履歴操作（元の互換性を残す） -->
@@ -280,12 +276,7 @@ const eventLog = [];
 let lastMinuteLogged = -1;
 const nowSec = ()=> endTime ?? Math.floor((Date.now()-startTime)/1000);
 
-/* --- Editing mode state --- */
-let editMode = false;
-
 /* Chart plugin & chart (元コード維持) */
-/* -- NOTE: datasets now include `tension` for curved lines. Also default pointRadius kept 0 for tidy look.
-         When editMode = true we will temporarily show points (pointRadius) to make clicking easier. */
 const phaseOverlayPlugin = {
   id: 'phaseOverlay',
   afterDraw(chart){
@@ -376,14 +367,39 @@ function calcRoR(){
  }
 }
 
-/* rebuild minuteLog & table from current series arrays */
+/* helper: ensure series sorted by x */
+function sortSeries(){
+  tempData.sort((a,b)=>a.x - b.x);
+  gasData.sort((a,b)=>a.x - b.x);
+  airData.sort((a,b)=>a.x - b.x);
+  rorData.sort((a,b)=>a.x - b.x);
+}
+
+/* helper: set or remove point in a series at exact second */
+function setSeriesValueAt(series, sec, value){
+  // sec: integer seconds
+  // value: number or null/"" to remove
+  const idx = series.findIndex(p => Math.round(p.x) === Math.round(sec));
+  if(value === null || value === "" || value === undefined){
+    if(idx !== -1) series.splice(idx,1);
+    return;
+  }
+  const n = Number(value);
+  if(isNaN(n)) return;
+  if(idx !== -1){
+    series[idx].y = n;
+  } else {
+    series.push({x: sec, y: n});
+  }
+}
+
+/* rebuild minuteLog & table from current series arrays (and attach editing) */
 function rebuildMinuteLogFromSeries(){
   minuteLog.length = 0;
   const tbody = document.querySelector("#logTable tbody");
   tbody.innerHTML = "";
-  // find max second
-  const maxX = Math.max(
-    0,
+  // find max second among series
+  const maxX = Math.max(0,
     ...(tempData.map(d=>d.x)),
     ...(gasData.map(d=>d.x)),
     ...(airData.map(d=>d.x))
@@ -405,10 +421,83 @@ function rebuildMinuteLogFromSeries(){
     };
     minuteLog.push(JSON.parse(JSON.stringify(rec)));
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${rec.time}</td><td>${rec.temp}</td><td>${rec.gas}</td><td>${rec.air}</td><td>${rec.ror}</td>`;
+    tr.dataset.sec = String(sec);
+    tr.innerHTML = `<td>${rec.time}</td>
+      <td class="editable">${rec.temp}</td>
+      <td class="editable">${rec.gas}</td>
+      <td class="editable">${rec.air}</td>
+      <td>${rec.ror}</td>`;
     tbody.appendChild(tr);
   }
   lastMinuteLogged = minuteLog.length? minuteLog[minuteLog.length-1].min : -1;
+  wireMinuteLogEditable();
+}
+
+/* attach edit handlers to minute-log editable cells */
+function wireMinuteLogEditable(){
+  const tbody = document.querySelector("#logTable tbody");
+  if(!tbody) return;
+  // make editable and attach blur / key handlers
+  Array.from(tbody.querySelectorAll("tr")).forEach(tr=>{
+    const sec = parseInt(tr.dataset.sec,10);
+    if(isNaN(sec)) return;
+    const tCell = tr.children[1];
+    const gCell = tr.children[2];
+    const aCell = tr.children[3];
+    [tCell,gCell,aCell].forEach(cell=>{
+      cell.contentEditable = "true";
+      cell.classList.add("editable");
+      // commit on blur
+      cell.onblur = () => {
+        commitMinuteCellEdit(tr, cell, sec);
+      };
+      // commit on Enter key
+      cell.onkeydown = (e) => {
+        if(e.key === "Enter"){
+          e.preventDefault();
+          cell.blur();
+        }
+      };
+    });
+  });
+}
+
+/* commit edit: update corresponding series and redraw */
+function commitMinuteCellEdit(tr, cell, sec){
+  const colIndex = Array.prototype.indexOf.call(tr.children, cell); // 1=temp,2=gas,3=air
+  const raw = cell.textContent.trim();
+  if(colIndex === 1){
+    // temp
+    if(raw === ""){
+      setSeriesValueAt(tempData, sec, null);
+    } else {
+      const n = parseFloat(raw);
+      if(isNaN(n)){ alert("Temp は数値で入力してください"); return; }
+      setSeriesValueAt(tempData, sec, Math.round(n));
+    }
+  } else if(colIndex === 2){
+    // gas (one decimal)
+    if(raw === ""){
+      setSeriesValueAt(gasData, sec, null);
+    } else {
+      const n = parseFloat(raw);
+      if(isNaN(n)){ alert("Gas は数値で入力してください"); return; }
+      setSeriesValueAt(gasData, sec, Math.round(n*10)/10);
+    }
+  } else if(colIndex === 3){
+    // air (one decimal)
+    if(raw === ""){
+      setSeriesValueAt(airData, sec, null);
+    } else {
+      const n = parseFloat(raw);
+      if(isNaN(n)){ alert("Air は数値で入力してください"); return; }
+      setSeriesValueAt(airData, sec, Math.round(n*10)/10);
+    }
+  }
+  sortSeries();
+  calcRoR();
+  rebuildMinuteLogFromSeries(); // rebuild so table and series stay in sync
+  draw();
 }
 
 /* helper: create event table row for given event object and index */
@@ -468,7 +557,7 @@ function enableEventTempEditing(){
   });
 }
 
-/* Minute log update kept, but we will rebuild via rebuildMinuteLogFromSeries when appropriate */
+/* Minute log */
 function updateMinuteLogIfNeeded(){
  if(!startTime) return;
  const s = nowSec();
@@ -491,10 +580,13 @@ function updateMinuteLogIfNeeded(){
    minuteLog.push(JSON.parse(JSON.stringify(rec)));
    const tbody = document.querySelector("#logTable tbody");
    const tr = document.createElement("tr");
-   tr.innerHTML = `<td>${rec.time}</td><td>${rec.temp}</td><td>${rec.gas}</td><td>${rec.air}</td><td>${rec.ror}</td>`;
+   tr.dataset.sec = String(sec);
+   tr.innerHTML = `<td>${rec.time}</td><td class="editable">${rec.temp}</td><td class="editable">${rec.gas}</td><td class="editable">${rec.air}</td><td>${rec.ror}</td>`;
    tbody.appendChild(tr);
  }
  lastMinuteLogged = min;
+ // attach editing handlers to newly added rows
+ wireMinuteLogEditable();
 }
 
 function calcPhaseRatio(){
@@ -753,7 +845,10 @@ document.getElementById("historySelect").onchange = () => {
  if(r.minuteLog) r.minuteLog.forEach(m=>{
    minuteLog.push(m);
    const tr = document.createElement("tr");
-   tr.innerHTML = `<td>${m.time}</td><td>${m.temp}</td><td>${m.gas}</td><td>${m.air}</td><td>${m.ror}</td>`;
+   // ensure dataset-sec set for editing
+   const sec = minSecToSec(m.time);
+   tr.dataset.sec = isFinite(sec) ? String(sec) : "";
+   tr.innerHTML = `<td>${m.time}</td><td class="editable">${m.temp}</td><td class="editable">${m.gas}</td><td class="editable">${m.air}</td><td>${m.ror}</td>`;
    document.querySelector("#logTable tbody").appendChild(tr);
  });
  if(r.eventLog) r.eventLog.forEach(ev=>{
@@ -761,6 +856,8 @@ document.getElementById("historySelect").onchange = () => {
    const idxNow = eventLog.length-1;
    createEventRow(ev, idxNow);
  });
+ // attach minute log editors
+ wireMinuteLogEditable();
  // restore meta
  if(r.meta){
   document.getElementById("metaDate").value = r.meta.date || "";
@@ -954,7 +1051,7 @@ document.getElementById("csvBtn").onclick = () => {
  const map = {};
  tempData.forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].t = d.y; });
  gasData.forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].g = d.y; });
- airData.forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].a = d.y; });
+ airData.forEach(d=>{ map[d.x] = map[x = d.x] || {}; map[d.x].a = d.y; }); // keep original mapping
  rorData.forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].r = d.y; });
  Object.keys(map).map(Number).sort((a,b)=>a-b).forEach(k=>{
   const row = map[k];
@@ -971,7 +1068,7 @@ document.getElementById("csvBtn").onclick = () => {
  URL.revokeObjectURL(url);
 };
 
-/* CSV Import: loadCsv input handler (existing) with auto-save to roastHistory (keeps compatibility) */
+/* CSV Import: loadCsv input handler (existing) with createEventRow use */
 document.getElementById("loadCsv").onchange = e => {
  const file = e.target.files[0];
  if(!file) return;
@@ -985,7 +1082,6 @@ document.getElementById("loadCsv").onchange = e => {
    document.querySelector("#eventTable tbody").innerHTML = "";
    let lines = text.split(/\r?\n/);
    let mode = "";
-   // local temp holders for meta that may come from CSV
    let importedMeta = { date: "", country: "", farm: "", variety: "", process: "", altitude: "" };
    lines.forEach(raw=>{
      const line = raw.trim();
@@ -1014,9 +1110,8 @@ document.getElementById("loadCsv").onchange = e => {
        if(isFinite(tSec)){
          const ev = { name, t: tSec, temp: tStr? Number(tStr):"", gas: gStr? Number(gStr):"", air: aStr? Number(aStr):"" };
          eventLog.push(ev);
-         const tr = document.createElement("tr");
-         tr.innerHTML = `<td>${ev.name}</td><td>${timeStr}</td><td>${ev.temp}</td><td>${ev.gas}</td><td>${ev.air}</td>`;
-         document.querySelector("#eventTable tbody").appendChild(tr);
+         const idxNow = eventLog.length-1;
+         createEventRow(ev, idxNow);
        }
        return;
      }
@@ -1027,7 +1122,8 @@ document.getElementById("loadCsv").onchange = e => {
          const rec = { min: Math.floor(sec/60), time: timeStr, temp: tStr||"", gas: gStr||"", air: aStr||"", ror: rStr||"" };
          minuteLog.push(rec);
          const tr = document.createElement("tr");
-         tr.innerHTML = `<td>${rec.time}</td><td>${rec.temp}</td><td>${rec.gas}</td><td>${rec.air}</td><td>${rec.ror}</td>`;
+         tr.dataset.sec = String(sec);
+         tr.innerHTML = `<td>${rec.time}</td><td class="editable">${rec.temp}</td><td class="editable">${rec.gas}</td><td class="editable">${rec.air}</td><td>${rec.ror}</td>`;
          document.querySelector("#logTable tbody").appendChild(tr);
        }
        return;
@@ -1051,9 +1147,11 @@ document.getElementById("loadCsv").onchange = e => {
      enableEventTempEditing();
    }
    lastMinuteLogged = minuteLog.length? minuteLog[minuteLog.length-1].min : -1;
+   // ensure tables wired
+   wireMinuteLogEditable();
    draw();
 
-   // save imported as history so Compare can use it
+   // 保存して比較欄に反映（既存の UX を尊重）
    try{
      const h = JSON.parse(localStorage.getItem("roastHistory") || "[]");
      const snapshot = {
@@ -1084,13 +1182,12 @@ document.getElementById("loadCsv").onchange = e => {
    }catch(err){
      console.warn("Import -> save history failed:", err);
    }
-
  };
  reader.readAsText(file);
 };
 
 /* ========== ここから DB 検索 / 統計機能 ========== */
-
+/* (省略せず既存実装と互換) */
 function computePhasesForSnapshot(s){
   const tp = s.tpTime, dry = s.dryTime, fc = s.fcTime, drop = s.dropTime;
   if(tp==null || dry==null || fc==null || drop==null) return null;
@@ -1262,162 +1359,7 @@ document.getElementById("dbSearchPanel").style.display = 'block';
 document.getElementById("greenBeanPanel").style.display = 'block';
 
 /* expose for debugging (optional) */
-window._roast_search = { searchRoastHistory, renderSearchResults, computePhasesForSnapshot };
-
-/* ===========================
-   === Editing mode logic ===
-   =========================== */
-
-/* Toggle edit mode (changes pointRadius so points are visible) */
-document.getElementById("editSeriesBtn").onclick = () => {
-  editMode = !editMode;
-  const btn = document.getElementById("editSeriesBtn");
-  const hint = document.getElementById("editHint");
-  if(editMode){
-    btn.textContent = "編集モード（ON）: クリックで編集";
-    hint.style.display = "block";
-    // expose points to be clickable
-    chart.data.datasets.forEach(ds=>{
-      ds.pointRadius = ds.label === "RoR" ? 0 : 5; // ログの編集対象は Temp/Gas/Air（RoRは読み取り専用）
-    });
-  } else {
-    btn.textContent = "編集モードを開始";
-    hint.style.display = "none";
-    chart.data.datasets.forEach(ds=> ds.pointRadius = 0);
-  }
-  chart.update();
-};
-
-/* Helper: sort series by x after modifications */
-function sortSeries(){
-  tempData.sort((a,b)=>a.x - b.x);
-  gasData.sort((a,b)=>a.x - b.x);
-  airData.sort((a,b)=>a.x - b.x);
-  rorData.sort((a,b)=>a.x - b.x);
-}
-
-/* Convert mm:ss string or seconds number -> seconds */
-function parseTimeInput(input, currentSec){
-  if(input === null) return null;
-  const v = (""+input).trim();
-  if(v === "") return null;
-  // allow direct seconds
-  if(/^\d+$/.test(v)) return parseInt(v,10);
-  // mm:ss
-  const parts = v.split(":").map(Number);
-  if(parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) return parts[0]*60 + parts[1];
-  // fallback: try parseFloat
-  const n = parseFloat(v);
-  if(!isNaN(n)) return Math.round(n);
-  return null;
-}
-
-/* Click handler on chart: find nearest editable point and prompt user */
-document.getElementById("chart").addEventListener("click", function(evt){
-  if(!editMode) return;
-  const rect = chart.canvas.getBoundingClientRect();
-  const xPixel = evt.clientX - rect.left;
-  const yPixel = evt.clientY - rect.top;
-  // datasets to consider: Temp (0), Gas (2), Air (3)
-  const candidates = [
-    {dsIndex:0, arr: tempData, yAxisId: chart.data.datasets[0].yAxisID || 'y', label: 'Temp'},
-    {dsIndex:2, arr: gasData,  yAxisId: chart.data.datasets[2].yAxisID || 'y', label: 'Gas'},
-    {dsIndex:3, arr: airData,  yAxisId: chart.data.datasets[3].yAxisID || 'y', label: 'Air'}
-  ];
-  let best = {dist: Infinity};
-  candidates.forEach(c=>{
-    const xScale = chart.scales.x;
-    const yScale = chart.scales[c.yAxisId] || chart.scales['y'];
-    c.arr.forEach((p, i) => {
-      const px = xScale.getPixelForValue(p.x);
-      const py = yScale.getPixelForValue(p.y);
-      const d = Math.hypot(px - xPixel, py - yPixel);
-      if(d < best.dist){
-        best = {dist: d, candidate: c, idx: i, px, py, point: p};
-      }
-    });
-  });
-  const THRESH = 20; // pixels tolerance
-  if(!best.candidate || best.dist > THRESH){
-    alert("近くに編集可能な点が見つかりません。点に近づけてもう一度クリックしてください。");
-    return;
-  }
-
-  const seriesLabel = best.candidate.label;
-  const p = best.point;
-  const currentTime = secToMinSec(p.x);
-  const currentVal = p.y;
-  // prompt user for new time and new value (user can press cancel to skip)
-  const newTimeInput = prompt(`${seriesLabel} 点の時間を入力してください（mm:ss）\n現在: ${currentTime}\n(空欄で時間を変更しません)`, currentTime);
-  if(newTimeInput === null) {
-    // user cancelled full edit -> allow editing value only
-    const newValOnly = prompt(`${seriesLabel} 点の値を入力してください\n現在: ${currentVal}\n(空欄で値を変更しません)`, String(currentVal));
-    if(newValOnly === null) return;
-    if(newValOnly.trim() !== ""){
-      const nv = parseFloat(newValOnly);
-      if(!isNaN(nv)){
-        best.candidate.arr[best.idx].y = nv;
-        // if editing Temp, recalc roR
-        sortSeries();
-        calcRoR();
-        rebuildMinuteLogFromSeries();
-        draw();
-      } else alert("数値入力ではありません");
-    }
-    return;
-  }
-
-  // user provided something (may be empty)
-  const parsedTime = parseTimeInput(newTimeInput, p.x);
-  const newValInput = prompt(`${seriesLabel} 点の値を入力してください\n現在: ${currentVal}\n(空欄で値を変更しません)`, String(currentVal));
-  if(newValInput === null) {
-    // user cancelled value prompt -> only time change (if provided)
-    if(parsedTime !== null){
-      best.candidate.arr[best.idx].x = parsedTime;
-      sortSeries();
-      calcRoR();
-      rebuildMinuteLogFromSeries();
-      draw();
-    }
-    return;
-  }
-
-  // if user typed 'd' or 'D' in value prompt, delete the point
-  if(newValInput.trim().toLowerCase() === 'd'){
-    best.candidate.arr.splice(best.idx, 1);
-    sortSeries();
-    calcRoR();
-    rebuildMinuteLogFromSeries();
-    draw();
-    return;
-  }
-
-  // otherwise apply updates
-  let applied = false;
-  if(parsedTime !== null){
-    best.candidate.arr[best.idx].x = parsedTime;
-    applied = true;
-  }
-  if(newValInput.trim() !== ""){
-    const nv = parseFloat(newValInput);
-    if(!isNaN(nv)){
-      best.candidate.arr[best.idx].y = nv;
-      applied = true;
-    } else {
-      alert("値が数値ではありません。変更は適用されませんでした。");
-    }
-  }
-  if(applied){
-    sortSeries();
-    calcRoR();
-    rebuildMinuteLogFromSeries();
-    draw();
-  }
-});
-
-/* ===========================
-   === End edit mode logic ===
-   =========================== */
+window._roast_search = { searchRoastHistory, renderSearchResults, computePhasesForSnapshot, setSeriesValueAt };
 
 </script>
 </body>
