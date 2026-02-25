@@ -1361,6 +1361,268 @@ document.getElementById("greenBeanPanel").style.display = 'block';
 /* expose for debugging (optional) */
 window._roast_search = { searchRoastHistory, renderSearchResults, computePhasesForSnapshot, setSeriesValueAt };
 
+<!-- ▼ 以下を既存の script の末尾にそのまま貼る（重複しないよう1回だけ） -->
+<style>
+/* シンプルなマイクボタン */
+#voiceMicBtn {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width:56px;
+  height:56px;
+  border-radius:50%;
+  background: linear-gradient(135deg,#e53935,#ff7043);
+  color:white;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:22px;
+  box-shadow:0 6px 18px rgba(0,0,0,0.2);
+  z-index:9999;
+  cursor:pointer;
+  user-select:none;
+}
+#voiceMicBtn.recording { background: linear-gradient(135deg,#43a047,#66bb6a); transform:scale(1.03); }
+#voiceStatus {
+  position: fixed;
+  right: 84px;
+  bottom: 24px;
+  background: rgba(0,0,0,0.7);
+  color: #fff;
+  padding:6px 10px;
+  border-radius:6px;
+  font-size:13px;
+  z-index:9999;
+  display:none;
+}
+</style>
+
+<div id="voiceStatus">Listening...</div>
+<div id="voiceMicBtn" title="Toggle voice input">🎙</div>
+
+<script>
+(function(){
+  // feature detect
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  const micBtn = document.getElementById("voiceMicBtn");
+  const statusBox = document.getElementById("voiceStatus");
+  let recognizing = false;
+  let recog = null;
+
+  // helper: show status
+  function showStatus(on){
+    statusBox.style.display = on ? "block" : "none";
+  }
+
+  // helper: extract first numeric (e.g. "180", "2.5") from text
+  function extractNumber(text){
+    if(!text) return null;
+    // look for digits like 123 or 123.4
+    const m = text.match(/-?\d+(?:[.,]\d+)?/);
+    if(!m) return null;
+    return parseFloat(m[0].replace(",","."));
+  }
+
+  // helper: normalize recognized text (lowercase, trim)
+  function normalize(t){ return (t||"").toLowerCase().trim(); }
+
+  // when speech result arrives -> handle commands and input insertion
+  function handleResult(transcript){
+    const t = normalize(transcript);
+    // 1) command keywords (japanese & english)
+    if(/(スタート|開始|開始する|start)/.test(t)){
+      const btn = document.getElementById("startBtn");
+      if(btn) btn.click();
+      return;
+    }
+    if(/(ドロップ|drop)/.test(t)){
+      const btn = document.getElementById("dropBtn");
+      if(btn) btn.click();
+      return;
+    }
+    if(/(tp|ターン|ターンリング|turning|ターンポイント|ターニングポイント)/.test(t)){
+      const btn = document.getElementById("tpBtn");
+      if(btn) btn.click();
+      return;
+    }
+    if(/(乾燥|ドライ|ドライエンド|dry|dry end)/.test(t)){
+      // emulate long-press: just set dryTime and add event log
+      if(typeof dryTime === "undefined"){} // noop if not present
+      const el = document.getElementById("dryBtn");
+      if(el){
+        // call same behavior as longpress: set time
+        dryTime = nowSec ? nowSec() : (Math.floor((Date.now()-startTime)/1000) || 0);
+        if(typeof addEventLog === "function") addEventLog("Dry End");
+        if(typeof draw === "function") draw();
+      }
+      return;
+    }
+    if(/(ファーストクラック|1st crack|ファースト クラック|ファーストクラック|クラック)/.test(t)){
+      const el = document.getElementById("fcBtn");
+      if(el){
+        fcTime = nowSec ? nowSec() : (Math.floor((Date.now()-startTime)/1000) || 0);
+        if(typeof addEventLog === "function") addEventLog("1st Crack");
+        if(typeof draw === "function") draw();
+      }
+      return;
+    }
+
+    // 2) set numeric values by spoken prefix:
+    // examples: "temp 180", "豆温 180", "gas 2.5", "air 1.2"
+    if(/(temp|豆温|とうおん|温度)/.test(t)){
+      const n = extractNumber(transcript);
+      if(n !== null){
+        // set temp input and call existing handler
+        const tempInput = document.getElementById("tempInput");
+        if(tempInput) tempInput.value = Math.round(n);
+        const btn = document.getElementById("tempSet");
+        if(btn) btn.click();
+      }
+      return;
+    }
+    if(/(gas|ガス)/.test(t)){
+      const n = extractNumber(transcript);
+      if(n !== null){
+        const input = document.getElementById("gasInput");
+        if(input) input.value = Math.round(n*10)/10;
+        const setFn = document.getElementById("gasSet");
+        if(setFn) setFn.click();
+        else if(typeof setGas === "function") setGas(Math.round(n*10)/10);
+      }
+      return;
+    }
+    if(/(air|エア|空気)/.test(t)){
+      const n = extractNumber(transcript);
+      if(n !== null){
+        const input = document.getElementById("airInput");
+        if(input) input.value = Math.round(n*10)/10;
+        const setFn = document.getElementById("airSet");
+        if(setFn) setFn.click();
+        else if(typeof setAir === "function") setAir(Math.round(n*10)/10);
+      }
+      return;
+    }
+
+    // 3) default: insert into focused input (if any)
+    const active = document.activeElement;
+    if(active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")){
+      // numeric fields parse numbers
+      if(active.type === "number" || /temp|gas|air|metaAltitude/i.test(active.id)){
+        const n = extractNumber(transcript);
+        if(n !== null){
+          active.value = n;
+          // optionally trigger related buttons
+          if(active.id === "gasInput"){
+            const setBtn = document.getElementById("gasSet");
+            if(setBtn) setBtn.click();
+          } else if(active.id === "airInput"){
+            const setBtn = document.getElementById("airSet");
+            if(setBtn) setBtn.click();
+          } else if(active.id === "tempInput"){
+            const setBtn = document.getElementById("tempSet");
+            if(setBtn) setBtn.click();
+          }
+        } else {
+          // if no number, just set raw text
+          active.value = transcript;
+        }
+      } else {
+        active.value = transcript;
+      }
+      return;
+    }
+
+    // 4) fallback: if it contains a number, push as a temp datapoint at the last minute
+    const n = extractNumber(transcript);
+    if(n !== null){
+      // set as latest temp
+      if(typeof tempData !== "undefined" && Array.isArray(tempData)){
+        const secNow = nowSec ? nowSec() : Math.floor((Date.now()-(startTime||Date.now()))/1000);
+        tempData.push({x: secNow, y: Math.round(n)});
+        if(typeof sortSeries === "function") sortSeries();
+        if(typeof calcRoR === "function") calcRoR();
+        if(typeof draw === "function") draw();
+      }
+    } else {
+      // nothing matched: show short toast
+      statusBox.textContent = "認識結果: " + transcript;
+      setTimeout(()=> statusBox.style.display = "none", 2000);
+      statusBox.style.display = "block";
+    }
+  }
+
+  // start / stop recognition
+  function startRec(){
+    if(!SpeechRecognition){
+      alert("このブラウザは音声認識をサポートしていません。\niPhoneならキーボードのマイク（音声入力）を使うか、Chrome/Edge（Android/PC）でお試しください。");
+      return;
+    }
+    if(recog) return;
+    recog = new SpeechRecognition();
+    recog.lang = "ja-JP";
+    recog.interimResults = false;
+    recog.maxAlternatives = 1;
+    recog.continuous = false;
+
+    recog.onstart = () => {
+      recognizing = true;
+      micBtn.classList.add("recording");
+      showStatus(true);
+      statusBox.textContent = "Listening...";
+    };
+    recog.onend = () => {
+      recognizing = false;
+      micBtn.classList.remove("recording");
+      showStatus(false);
+      // clear instance so clicking reinitializes
+      recog = null;
+    };
+    recog.onerror = (e) => {
+      console.warn("SpeechRecognition error:", e);
+      recognizing = false;
+      micBtn.classList.remove("recording");
+      showStatus(false);
+      recog = null;
+      alert("音声認識中にエラーが発生しました。ブラウザのマイク許可を確認してください。");
+    };
+    recog.onresult = (ev) => {
+      const text = Array.from(ev.results).map(r=>r[0].transcript).join(" ");
+      handleResult(text);
+    };
+    try{
+      recog.start();
+    }catch(err){
+      console.warn("recog.start failed:", err);
+    }
+  }
+
+  function stopRec(){
+    if(recog){
+      try{ recog.stop(); }catch(e){}
+      recog = null;
+    }
+    recognizing = false;
+    micBtn.classList.remove("recording");
+    showStatus(false);
+  }
+
+  micBtn.addEventListener("click", ()=>{
+    if(recognizing) stopRec();
+    else startRec();
+  });
+
+  // handy: start by long-pressing mic on mobile
+  let longTouchTimer = null;
+  micBtn.addEventListener("touchstart", (e)=>{ longTouchTimer = setTimeout(startRec, 300); }, {passive:true});
+  micBtn.addEventListener("touchend", (e)=>{ if(longTouchTimer){ clearTimeout(longTouchTimer); longTouchTimer = null; } }, {passive:true});
+
+  // expose for debugging
+  window._voiceInput = { startRec, stopRec, handleResult };
+
+  // note about fallback:
+  // - iOS Safari historically has limited support for SpeechRecognition in-page.
+  // - If in iOS Safari, recommend using the keyboard microphone (dictation) or use a backend STT service (e.g. Whisper, Google Speech-to-Text) if you need robust cross-browser support.
+})();
 </script>
 </body>
 </html>
