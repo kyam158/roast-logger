@@ -92,6 +92,13 @@ body.ipad #chartWrap{height:48vh}
 
 /* make editable minute log cells visually distinct */
 #logTable td.editable { background:#fff9e6; border:1px dashed #f0c040; outline:none; }
+
+/* voice UI */
+.voice-row{display:flex;gap:6px;align-items:center;margin:6px 0}
+#voiceBtn{width:56px;padding:8px;border-radius:8px;font-size:18px}
+#voiceStatus{flex:1;font-size:13px;color:#444}
+#voiceBtn.recording{background:#d32f2f;color:#fff}
+#voiceBtn.disabled{opacity:0.4;pointer-events:none}
 </style>
 </head>
 
@@ -160,6 +167,12 @@ body.ipad #chartWrap{height:48vh}
       <button id="dryBtn">Dry End（長押し）</button>
       <button id="fcBtn">1st Crack（長押し）</button>
       <button id="dropBtn">DROP</button>
+
+      <!-- -- 音声UIを追加（壊さない・最小限） -->
+      <div class="voice-row">
+        <button id="voiceBtn" title="音声入力を開始">🎤</button>
+        <div id="voiceStatus">音声入力：未接続</div>
+      </div>
 
       <button id="csvBtn">CSV Export</button>
       <input id="loadCsv" type="file" accept=".csv">
@@ -1361,6 +1374,153 @@ document.getElementById("greenBeanPanel").style.display = 'block';
 /* expose for debugging (optional) */
 window._roast_search = { searchRoastHistory, renderSearchResults, computePhasesForSnapshot, setSeriesValueAt };
 
+/* =======================
+   音声入力機能の追加（ここから）
+   - 既存ロジックは壊さない
+   ======================= */
+
+(function(){
+  const voiceBtn = document.getElementById("voiceBtn");
+  const voiceStatus = document.getElementById("voiceStatus");
+  // speech API
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SpeechRecognition){
+    voiceBtn.classList.add("disabled");
+    voiceStatus.textContent = "音声入力：お使いのブラウザは未対応です（Chrome推奨）";
+    return;
+  }
+
+  const recog = new SpeechRecognition();
+  recog.lang = 'ja-JP';
+  recog.interimResults = false;
+  recog.continuous = false;
+
+  let listening = false;
+
+  // helper actions so we reuse existing logic
+  function markTP(){ tpTime = nowSec(); addEventLog("Turning Point"); draw(); }
+  function markDry(){ dryTime = nowSec(); addEventLog("Dry End"); draw(); }
+  function markFC(){ fcTime = nowSec(); addEventLog("1st Crack"); draw(); }
+  function markDrop(){ dropTime = nowSec(); endTime = dropTime; addEventLog("Drop"); clearInterval(timer); enableEventTempEditing(); draw(); saveHistory(); }
+
+  // parse recognized transcript and map to commands
+  function handleTranscript(text){
+    const t = (text||"").toLowerCase().trim();
+    // try numeric commands: temperature / gas / air
+    // Extract first number in the string
+    const numMatch = t.match(/([0-9]+(?:[.,][0-9]+)?)/);
+    const num = numMatch ? numMatch[1].replace(",",".") : null;
+
+    // temp
+    if(/\b(temp|temperature|豆温|温度|とうおん|とうおん)\b/.test(t) || /\bだん(ど|ど)\b/.test(t)){
+      if(num){
+        document.getElementById("tempInput").value = Math.round(parseFloat(num));
+        document.getElementById("tempSet").click();
+        return voiceStatus.textContent = `音声: 豆温を ${document.getElementById("tempInput").value} に設定しました`;
+      }
+    }
+    // gas
+    if(/\b(gas|がす|ガス)\b/.test(t)){
+      if(num){
+        const v = Math.round(parseFloat(num)*10)/10;
+        document.getElementById("gasInput").value = v;
+        document.getElementById("gasSet").click();
+        return voiceStatus.textContent = `音声: Gas を ${v} に設定しました`;
+      }
+    }
+    // air
+    if(/\b(air|あいあ|エア|風|空気)\b/.test(t)){
+      if(num){
+        const v = Math.round(parseFloat(num)*10)/10;
+        document.getElementById("airInput").value = v;
+        document.getElementById("airSet").click();
+        return voiceStatus.textContent = `音声: Air を ${v} に設定しました`;
+      }
+    }
+
+    // start
+    if(/\b(開始|はじめ|スタート|start)\b/.test(t)){
+      document.getElementById("startBtn").click();
+      return voiceStatus.textContent = "音声: 焙煎を開始しました";
+    }
+
+    // TP / Dry / FC / Drop
+    if(/\b(tp|turn|ターン|ターンポイント)\b/.test(t)){
+      markTP(); return voiceStatus.textContent = "音声: Turning Point 記録";
+    }
+    if(/\b(dry|ドライ|ドライエンド|dry end)\b/.test(t)){
+      markDry(); return voiceStatus.textContent = "音声: Dry End 記録";
+    }
+    if(/\b(1c|1st|ファーストクラック|ファースト)\b/.test(t)){
+      markFC(); return voiceStatus.textContent = "音声: 1st Crack 記録";
+    }
+    if(/\b(drop|ドロップ|落とす|ドロップしました)\b/.test(t)){
+      markDrop(); return voiceStatus.textContent = "音声: DROP（焙煎終了）を記録しました";
+    }
+
+    // add named event: "イベント 焙煎終了" or simply "イベント 焙煎"
+    if(/\b(event|イベント|えべんと)\b/.test(t)){
+      // capture words after "イベント" or "event"
+      const m = t.match(/\b(?:event|イベント)\s*(.+)$/);
+      const name = (m && m[1]) ? m[1].trim() : 'VoiceEvent';
+      addEventLog(name);
+      return voiceStatus.textContent = `音声: イベント '${name}' を追加しました`;
+    }
+
+    // fallback: if starts with a word and contains a number, maybe it's an event name+number? we'll try
+    if(num && t){
+      // if no keyword detected but contains number, assume temp
+      document.getElementById("tempInput").value = Math.round(parseFloat(num));
+      document.getElementById("tempSet").click();
+      return voiceStatus.textContent = `音声（推測）: 豆温を ${document.getElementById("tempInput").value} に設定しました`;
+    }
+
+    // nothing matched
+    voiceStatus.textContent = `音声: 認識結果: "${text}"（対応コマンドが見つかりません）`;
+  }
+
+  recog.onstart = () => {
+    listening = true;
+    voiceBtn.classList.add("recording");
+    voiceStatus.textContent = "音声入力：聞き取り中… 話してください";
+  };
+  recog.onend = () => {
+    listening = false;
+    voiceBtn.classList.remove("recording");
+    // don't override last message if it contains result
+    if(voiceStatus.textContent === "音声入力：聞き取り中… 話してください") voiceStatus.textContent = "音声入力：待機中";
+  };
+  recog.onerror = (ev) => {
+    listening = false;
+    voiceBtn.classList.remove("recording");
+    voiceStatus.textContent = `音声エラー: ${ev.error || 'unknown'}`;
+  };
+  recog.onresult = (ev) => {
+    const transcript = Array.from(ev.results).map(r=>r[0].transcript).join(" ");
+    handleTranscript(transcript);
+  };
+
+  // toggle button
+  voiceBtn.onclick = () => {
+    if(listening){
+      recog.stop();
+      // onend will fire
+    } else {
+      try{
+        recog.start();
+      }catch(err){
+        voiceStatus.textContent = "音声入力の開始に失敗しました：" + err.message;
+      }
+    }
+  };
+
+  // show initial availability
+  voiceStatus.textContent = "音声入力：準備完了（ボタンを押して話してください）";
+})();
+
+/* =======================
+   音声入力機能の追加（ここまで）
+   ======================= */
 
 </script>
 </body>
