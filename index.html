@@ -371,13 +371,77 @@ const chart = new Chart(document.getElementById("chart"),{
 });
 
 /* ===== core functions (ほぼ元通り) ===== */
+/* === 変更：RoR を minuteLog の Time/Temp のみを参照して計算する === */
 function calcRoR(){
- rorData.length=0;
- for(let i=1;i<tempData.length;i++){
-  const p=tempData[i-1],c=tempData[i];
-  const dt=c.x-p.x;if(dt<=0)continue;
-  rorData.push({x:c.x,y:+((c.y-p.y)*60/dt).toFixed(1)});
- }
+  // rorData を minuteLog ベースで再計算する
+  rorData.length = 0;
+
+  // minuteLog から有効な点 (秒, temp) を作る
+  const valid = minuteLog
+    .map(m => {
+      const sec = minSecToSec(m.time);
+      const t = (m.temp === "" || m.temp === undefined) ? NaN : Number(m.temp);
+      if(sec == null || !isFinite(sec) || isNaN(t)) return null;
+      return { x: Number(sec), y: Number(t) };
+    })
+    .filter(Boolean)
+    .sort((a,b)=>a.x - b.x);
+
+  if(valid.length < 2){
+    // minuteLog に有効点が 2点未満の場合は rorData を空にし、table の ror をクリア
+    rorData.length = 0;
+    // clear displayed RoR column
+    Array.from(document.querySelectorAll("#logTable tbody tr")).forEach(tr=>{
+      if(tr.children[4]) tr.children[4].textContent = "";
+    });
+    // update chart dataset
+    chart.data.datasets[1].data = rorData;
+    return;
+  }
+
+  // 隣接2点差分で RoR を計算 (Δ℃ / Δsec × 60 -> ℃/min)
+  for(let i=1;i<valid.length;i++){
+    const p = valid[i-1];
+    const c = valid[i];
+    const dt = c.x - p.x;
+    if(dt <= 0) continue;
+    const r = ((c.y - p.y) * 60 / dt);
+    rorData.push({ x: c.x, y: Number(r.toFixed(1)) });
+  }
+
+  // minuteLog の各行に対応する ror を埋める（テーブル表示も更新）
+  minuteLog.forEach(m=>{
+    const sec = minSecToSec(m.time);
+    if(sec == null || !isFinite(sec)){
+      m.ror = "";
+      return;
+    }
+    // rorData の中で同じ秒（丸めて比較）を探す。なければ近い過去の ror を採用
+    let found = rorData.find(r => Math.round(r.x) === Math.round(sec));
+    if(!found){
+      // 近い過去の ror を探す（同じロジックを元の表示に合わせる）
+      found = [...rorData].reverse().find(r => r.x <= sec);
+    }
+    m.ror = found ? String(found.y.toFixed ? found.y.toFixed(1) : Number(found.y).toFixed(1)) : "";
+  });
+
+  // テーブル中の RoR 列を更新
+  Array.from(document.querySelectorAll("#logTable tbody tr")).forEach(tr=>{
+    const sec = parseInt(tr.dataset.sec, 10);
+    if(isNaN(sec)) return;
+    const m = minuteLog.find(mm => {
+      const s = minSecToSec(mm.time);
+      return isFinite(s) && Math.round(s) === Math.round(sec);
+    });
+    if(m){
+      tr.children[4].textContent = m.ror ?? "";
+    } else {
+      tr.children[4].textContent = "";
+    }
+  });
+
+  // update chart dataset (draw will use it)
+  chart.data.datasets[1].data = rorData;
 }
 
 /* helper: ensure series sorted by x */
@@ -423,14 +487,14 @@ function rebuildMinuteLogFromSeries(){
     const tRec = [...tempData].reverse().find(d=>d.x<=sec);
     const gRec = [...gasData].reverse().find(d=>d.x<=sec);
     const aRec = [...airData].reverse().find(d=>d.x<=sec);
-    const rRec = [...rorData].reverse().find(d=>d.x<=sec);
+    // ror は calcRoR で後から埋めるので一旦空にする（calcRoR が呼ばれる前提）
     const rec = {
       min: m,
       time: secToMinSec(sec),
       temp: tRec? (Math.round(tRec.y)) : "",
       gas: gRec? gRec.y.toFixed(1) : "",
       air: aRec? aRec.y.toFixed(1) : "",
-      ror: rRec? rRec.y.toFixed(1) : ""
+      ror: ""
     };
     minuteLog.push(JSON.parse(JSON.stringify(rec)));
     const tr = document.createElement("tr");
@@ -508,8 +572,10 @@ function commitMinuteCellEdit(tr, cell, sec){
     }
   }
   sortSeries();
-  calcRoR();
+  // 重要：tempData/gasData/airData を元に minuteLog を作り直し、
+  //        minuteLog を参照して RoR を計算 -> 表示更新
   rebuildMinuteLogFromSeries(); // rebuild so table and series stay in sync
+  calcRoR();
   draw();
 }
 
@@ -581,14 +647,14 @@ function updateMinuteLogIfNeeded(){
    const tRec = [...tempData].reverse().find(d=>d.x<=sec);
    const gRec = [...gasData].reverse().find(d=>d.x<=sec);
    const aRec = [...airData].reverse().find(d=>d.x<=sec);
-   const rRec = [...rorData].reverse().find(d=>d.x<=sec);
+   // ror は calcRoR で付与される
    const rec = {
      min: m,
      time: secToMinSec(sec),
      temp: tRec? (Math.round(tRec.y)) : "",
      gas: gRec? gRec.y.toFixed(1) : "",
      air: aRec? aRec.y.toFixed(1) : "",
-     ror: rRec? rRec.y.toFixed(1) : ""
+     ror: ""
    };
    minuteLog.push(JSON.parse(JSON.stringify(rec)));
    const tbody = document.querySelector("#logTable tbody");
@@ -600,7 +666,11 @@ function updateMinuteLogIfNeeded(){
  lastMinuteLogged = min;
  // attach editing handlers to newly added rows
  wireMinuteLogEditable();
+ // recalc RoR since minuteLog changed
+ calcRoR();
 }
+
+/* ... (以降は元の calcPhaseRatio, draw, コントロール類と同じ) ... */
 
 function calcPhaseRatio(){
  if(tpTime==null || dryTime==null || fcTime==null || dropTime==null) return null;
@@ -625,6 +695,7 @@ function draw(){
  if(!startTime) return;
  const t = nowSec();
  document.getElementById("time").textContent = fmt(t);
+ // calcRoR は minuteLog ベースで動作する
  calcRoR();
  chart.data.datasets[0].data = tempData;
  chart.data.datasets[1].data = rorData;
@@ -1064,7 +1135,7 @@ document.getElementById("csvBtn").onclick = () => {
  const map = {};
  tempData.forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].t = d.y; });
  gasData.forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].g = d.y; });
- airData.forEach(d=>{ map[d.x] = map[x = d.x] || {}; map[d.x].a = d.y; }); // keep original mapping
+ airData.forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].a = d.y; }); // keep original mapping
  rorData.forEach(d=>{ map[d.x] = map[d.x] || {}; map[d.x].r = d.y; });
  Object.keys(map).map(Number).sort((a,b)=>a-b).forEach(k=>{
   const row = map[k];
@@ -1162,6 +1233,8 @@ document.getElementById("loadCsv").onchange = e => {
    lastMinuteLogged = minuteLog.length? minuteLog[minuteLog.length-1].min : -1;
    // ensure tables wired
    wireMinuteLogEditable();
+   // recalc RoR based on imported minuteLog
+   calcRoR();
    draw();
 
    // 保存して比較欄に反映（既存の UX を尊重）
@@ -1521,7 +1594,6 @@ window._roast_search = { searchRoastHistory, renderSearchResults, computePhasesF
 /* =======================
    音声入力機能の追加（ここまで）
    ======================= */
-
 
 </script>
 </body>
